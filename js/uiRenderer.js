@@ -48,7 +48,10 @@ export function renderUI(state, refs, actions, computed) {
   const achievements = [
     { id: 'first', name: 'First Sigil', done: state.lifetimeMana >= 100, reward: '+2% global' },
     { id: 'auto', name: 'Automancer', done: Object.values(state.generators).reduce((a, b) => a + b, 0) >= 25, reward: '+2% global' },
-    { id: 'prestige', name: 'Beyond Mortality', done: state.arcaneKnowledge > 0, reward: '+2% global' }
+    { id: 'prestige', name: 'Beyond Mortality', done: state.arcaneKnowledge > 0, reward: '+2% global' },
+    { id: 'archmage', name: 'Archmage Ascendant', done: state.arcaneKnowledge >= 25, reward: '+2% global' },
+    { id: 'overdrive', name: 'Aether Overdrive', done: state.lifetimeMana >= 1e9, reward: '+2% global' },
+    { id: 'eternal', name: 'Eternal Engine', done: state.lifetimeMana >= 1e13, reward: '+2% global' }
   ];
   for (const a of achievements) {
     if (a.done) state.achievements[a.id] = true;

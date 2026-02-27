@@ -3,7 +3,10 @@ export const spellDefs = [
   { id: 'surge', name: 'Mana Surge', cooldown: 36, unlock: 250, effect: () => 1.8, duration: 20, art: 'assets/spells/mana-surge.svg', type: 'boost' },
   { id: 'warp', name: 'Time Warp', cooldown: 45, unlock: 1200, effect: () => 2.2, duration: 10, art: 'assets/spells/time-warp.svg', type: 'speed' },
   { id: 'familiar', name: 'Familiar', cooldown: 30, unlock: 6500, effect: () => 12, duration: 18, art: 'assets/spells/familiar.svg', type: 'autoclick' },
-  { id: 'storm', name: 'Arcane Storm', cooldown: 90, unlock: 45000, effect: (state, mps) => mps * 65 + 2000, art: 'assets/spells/arcane-storm.svg', type: 'burst' }
+  { id: 'storm', name: 'Arcane Storm', cooldown: 90, unlock: 45000, effect: (state, mps) => mps * 65 + 2000, art: 'assets/spells/arcane-storm.svg', type: 'burst' },
+  { id: 'nova', name: 'Astral Nova', cooldown: 120, unlock: 850000, effect: (state, mps) => mps * 140 + 450000, art: 'assets/spells/arcane-storm.svg', type: 'burst' },
+  { id: 'stasis', name: 'Temporal Stasis', cooldown: 150, unlock: 18000000, effect: () => 4.2, duration: 14, art: 'assets/spells/time-warp.svg', type: 'speed' },
+  { id: 'legion', name: 'Legion of Familiars', cooldown: 180, unlock: 320000000, effect: () => 320, duration: 20, art: 'assets/spells/familiar.svg', type: 'autoclick' }
 ];
 
 export function isSpellReady(state, id, now = Date.now()) {
