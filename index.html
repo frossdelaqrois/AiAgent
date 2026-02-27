@@ -357,6 +357,7 @@
     function webIcon(glyph) {
       const codepoint = Array.from(glyph)
         .map((char) => char.codePointAt(0).toString(16))
+        .filter((code) => code !== "fe0f")
         .join("-");
       return `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/${codepoint}.png`;
     }
@@ -394,7 +395,7 @@
         name: "Rune Etching",
         cost: 1200,
         effect: "All spell power +30%",
-        image: webIcon("✴️"),
+        image: webIcon("🔯"),
         tooltip: "Arcane runes amplify the impact of every offensive cast.",
         apply: () => {},
       },
@@ -410,7 +411,7 @@
         name: "Leyline Binding",
         cost: 1400,
         effect: "All structures produce +25% mana",
-        image: webIcon("🕸️"),
+        image: webIcon("🧬"),
         tooltip: "Leyline Binding anchors your tower to nearby leylines, increasing all structure output.",
         apply: () => {},
       },
@@ -426,7 +427,7 @@
         name: "Archmage Sigil",
         cost: 26000,
         effect: "All structures produce +120% mana",
-        image: webIcon("🜂"),
+        image: webIcon("🔱"),
         tooltip: "An ancient sigil that supercharges every mana engine in your empire.",
         apply: () => {},
       },
@@ -468,8 +469,8 @@
       bolt: { name: "Arcane Bolt", basePower: 1, manaCost: 0, unlockAt: 0, image: webIcon("✨") },
       fireball: { name: "Fireball", basePower: 40, manaCost: 30, unlockAt: 300, image: webIcon("🔥") },
       lightning: { name: "Chain Lightning", basePower: 175, manaCost: 120, unlockAt: 2500, image: webIcon("⚡") },
-      meteor: { name: "Meteor Strike", basePower: 800, manaCost: 620, unlockAt: 14000, image: webIcon("☄️") },
-      voidburst: { name: "Void Burst", basePower: 3200, manaCost: 2600, unlockAt: 70000, image: webIcon("🕳️") },
+      meteor: { name: "Meteor Strike", basePower: 800, manaCost: 620, unlockAt: 14000, image: webIcon("🌠") },
+      voidburst: { name: "Void Burst", basePower: 3200, manaCost: 2600, unlockAt: 70000, image: webIcon("🌀") },
     };
 
     const achievementData = [
@@ -478,7 +479,7 @@
       { key: "mana250k", name: "Mana Hoarder III", image: webIcon("🥇"), test: (s) => s.totalMana >= 250000, requirement: "Accumulate 250,000 total mana.", reward: "+15% structure output", tooltip: "A mid-game mastery checkpoint that rewards sustained scaling." },
       { key: "mana2m", name: "Mana Sovereign", image: webIcon("👑"), test: (s) => s.totalMana >= 2000000, requirement: "Accumulate 2,000,000 total mana.", reward: "+25% structure output", tooltip: "A late milestone for long sessions, requiring a truly automated tower." },
       { key: "golem3", name: "Golem Battalion", image: webIcon("🏅"), test: (s) => s.structures.golem >= 3, requirement: "Own 3 Arcane Golems at the same time.", reward: "+15 click power", tooltip: "Construct three Arcane Golems to earn this badge and permanently strengthen manual casting." },
-      { key: "towerTycoon", name: "Tower Tycoon", image: webIcon("🏗️"), test: (s) => Object.values(s.structures).reduce((sum, amount) => sum + amount, 0) >= 80, requirement: "Own 80 total structures.", reward: "+20% structure output", tooltip: "Rewards broad investment across your whole structure roster." },
+      { key: "towerTycoon", name: "Tower Tycoon", image: webIcon("🏛️"), test: (s) => Object.values(s.structures).reduce((sum, amount) => sum + amount, 0) >= 80, requirement: "Own 80 total structures.", reward: "+20% structure output", tooltip: "Rewards broad investment across your whole structure roster." },
       { key: "skyLord", name: "Lord of the Sky", image: webIcon("🏰"), test: (s) => s.structures.skyCitadel >= 5, requirement: "Own 5 Sky Citadels.", reward: "+15% spell power", tooltip: "Your floating strongholds improve spell efficiency across all casts." },
       { key: "spellweaver", name: "Spellweaver", image: webIcon("📘"), test: (s) => s.spellCasts >= 250, requirement: "Cast 250 spells in total.", reward: "-10% spell costs", tooltip: "Dedicated casting lowers spell maintenance costs permanently." },
       { key: "voidCaller", name: "Void Caller", image: webIcon("🌌"), test: (s) => s.structures.voidReactor >= 2, requirement: "Own 2 Void Reactors.", reward: "+40 click power", tooltip: "A deep-end milestone that empowers manual burst play in the late game." },
@@ -758,6 +759,13 @@
           <button ${disabled ? "disabled" : ""}>Buy x${state.buyAmount}</button>
         `;
 
+        card.onclick = (event) => {
+          if (event.target.tagName === "BUTTON" || event.target.closest("button")) {
+            buyStructure(key);
+            return;
+          }
+          if (!disabled) buyStructure(key);
+        };
         card.querySelector("button").onclick = () => buyStructure(key);
         els.structures.appendChild(card);
       }
