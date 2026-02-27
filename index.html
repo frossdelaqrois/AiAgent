@@ -1,0 +1,610 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arcane Idle: Wizard Tower</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --accent: #9a7bff;
+      --accent-2: #53d3ff;
+      --text: #f3f4ff;
+      --muted: #b3b4d1;
+      --ok: #78f8ac;
+      --warn: #ffd479;
+      --danger: #ff7f9e;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 20% 20%, #232a62 0%, transparent 30%),
+        radial-gradient(circle at 80% 0%, #2f2162 0%, transparent 35%),
+        linear-gradient(180deg, #0d0e1f 0%, #090a16 100%);
+      padding: 20px;
+    }
+
+    .game {
+      max-width: 1080px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 14px;
+      padding: 16px;
+      backdrop-filter: blur(3px);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+    }
+
+    .wide { grid-column: 1 / -1; }
+
+    h1, h2, h3 { margin: 0 0 10px; }
+
+    h1 {
+      font-size: 1.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 10px;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .stat {
+      background: rgba(255,255,255,0.06);
+      border-radius: 10px;
+      padding: 10px;
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    .label { color: var(--muted); font-size: 0.82rem; }
+    .value { font-size: 1.2rem; font-weight: 700; }
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: linear-gradient(135deg, var(--accent), #6d4fff);
+      color: white;
+      cursor: pointer;
+      font-weight: 700;
+      transition: transform 0.08s ease, filter 0.15s ease;
+    }
+
+    button:hover:not(:disabled) { filter: brightness(1.08); }
+    button:active:not(:disabled) { transform: scale(0.985); }
+    button:disabled { cursor: not-allowed; opacity: 0.45; }
+
+    .btn-secondary {
+      background: linear-gradient(135deg, #2f3877, #4352a1);
+    }
+
+    .btn-danger {
+      background: linear-gradient(135deg, #b44b65, #91364e);
+    }
+
+    .shop {
+      display: grid;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      background: rgba(255,255,255,0.05);
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 10px;
+    }
+
+    .name { font-weight: 700; }
+    .meta { color: var(--muted); font-size: 0.85rem; margin-top: 2px; }
+
+    .pill {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(83,211,255,0.16);
+      color: var(--accent-2);
+      font-size: 0.8rem;
+      margin-left: 4px;
+    }
+
+    .row { display: flex; gap: 10px; }
+    .row button { flex: 1; }
+
+    .buy-toggle {
+      display: inline-flex;
+      border: 1px solid rgba(255,255,255,0.22);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-bottom: 10px;
+    }
+
+    .buy-toggle button {
+      border-radius: 0;
+      min-width: 58px;
+      background: rgba(255,255,255,0.06);
+      font-weight: 600;
+    }
+
+    .buy-toggle .active {
+      background: linear-gradient(135deg, var(--accent), #6d4fff);
+    }
+
+    #log {
+      height: 170px;
+      overflow: auto;
+      font-size: 0.9rem;
+      background: rgba(0,0,0,0.25);
+      border-radius: 10px;
+      padding: 8px;
+      border: 1px solid rgba(255,255,255,0.1);
+      margin-top: 10px;
+    }
+
+    .ok { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .danger { color: var(--danger); }
+
+    .tiny { font-size: 0.8rem; color: var(--muted); margin-top: 8px; }
+
+    @media (max-width: 900px) {
+      .game { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+  <main class="game">
+    <section class="panel wide">
+      <h1>
+        <span>🧙 Arcane Idle: Wizard Tower</span>
+        <span class="pill">Idle + Clicker</span>
+      </h1>
+      <div class="sub">Gather mana, train apprentices, and automate your magical empire.</div>
+      <div class="row">
+        <button id="castBtn">✨ Cast Arcane Bolt (+<span id="clickPower">1</span> mana)</button>
+        <button id="saveBtn" class="btn-secondary">💾 Save</button>
+        <button id="resetBtn" class="btn-danger">♻️ Reset</button>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="label">Mana</div><div class="value" id="mana">0</div></div>
+        <div class="stat"><div class="label">Mana / sec</div><div class="value" id="mps">0</div></div>
+        <div class="stat"><div class="label">Arcane Rank</div><div class="value" id="rank">Novice</div></div>
+        <div class="stat"><div class="label">Total Mana Ever</div><div class="value" id="totalMana">0</div></div>
+        <div class="stat"><div class="label">Autosave</div><div class="value" id="saveState">Ready</div></div>
+        <div class="stat"><div class="label">Buy Amount</div><div class="value" id="buyAmountLabel">x1</div></div>
+      </div>
+      <div class="tiny">Tip: Press <strong>spacebar</strong> to cast quickly.</div>
+    </section>
+
+    <section class="panel">
+      <h2>🧪 Structures</h2>
+      <div class="buy-toggle" id="buyToggle">
+        <button data-buy="1" class="active">x1</button>
+        <button data-buy="10">x10</button>
+        <button data-buy="25">x25</button>
+      </div>
+      <div id="structures" class="shop"></div>
+    </section>
+
+    <section class="panel">
+      <h2>🔮 Upgrades</h2>
+      <div id="upgrades" class="shop"></div>
+      <h3 style="margin-top: 16px;">🏆 Achievements</h3>
+      <div id="achievements" class="shop"></div>
+    </section>
+
+    <section class="panel wide">
+      <h2>📜 Event Log</h2>
+      <div id="log"></div>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "arcane-idle-save-v2";
+    const AUTO_SAVE_MS = 20000;
+
+    const structureData = {
+      apprentice: { name: "Apprentice", baseCost: 15, mps: 0.6, growth: 1.15 },
+      crystal: { name: "Mana Crystal", baseCost: 100, mps: 4, growth: 1.16 },
+      library: { name: "Enchanted Library", baseCost: 550, mps: 22, growth: 1.18 },
+      golem: { name: "Arcane Golem", baseCost: 2600, mps: 95, growth: 1.2 },
+      observatory: { name: "Astral Observatory", baseCost: 11000, mps: 440, growth: 1.23 },
+    };
+
+    const upgradeData = {
+      focusedWand: {
+        name: "Focused Wand",
+        cost: 60,
+        effect: "Double click power",
+        apply: (state) => state.clickPower *= 2,
+      },
+      dualChanneling: {
+        name: "Dual Channeling",
+        cost: 450,
+        effect: "Clicks gain +8 mana",
+        apply: (state) => state.clickPower += 8,
+      },
+      leylineBinding: {
+        name: "Leyline Binding",
+        cost: 1400,
+        effect: "All structures produce +25% mana",
+        apply: () => {},
+      },
+      crystallizedThought: {
+        name: "Crystallized Thought",
+        cost: 6000,
+        effect: "All structures produce +50% mana",
+        apply: () => {},
+      },
+    };
+
+    const achievementData = [
+      { key: "mana1k", name: "Mana Hoarder I", test: (s) => s.totalMana >= 1000, reward: "+5% structure output" },
+      { key: "mana20k", name: "Mana Hoarder II", test: (s) => s.totalMana >= 20000, reward: "+10% structure output" },
+      { key: "golem3", name: "Golem Battalion", test: (s) => s.structures.golem >= 3, reward: "+15 click power" },
+    ];
+
+    const state = {
+      mana: 0,
+      totalMana: 0,
+      clickPower: 1,
+      buyAmount: 1,
+      structures: Object.fromEntries(Object.keys(structureData).map((k) => [k, 0])),
+      upgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, false])),
+      achievements: Object.fromEntries(achievementData.map((a) => [a.key, false])),
+      lastTick: Date.now(),
+      lastSavedAt: null,
+      log: [{ text: "Welcome, wizard. Your tower awaits.", klass: "" }],
+    };
+
+    const els = {
+      mana: document.getElementById("mana"),
+      totalMana: document.getElementById("totalMana"),
+      mps: document.getElementById("mps"),
+      rank: document.getElementById("rank"),
+      clickPower: document.getElementById("clickPower"),
+      saveState: document.getElementById("saveState"),
+      buyAmountLabel: document.getElementById("buyAmountLabel"),
+      castBtn: document.getElementById("castBtn"),
+      saveBtn: document.getElementById("saveBtn"),
+      resetBtn: document.getElementById("resetBtn"),
+      buyToggle: document.getElementById("buyToggle"),
+      structures: document.getElementById("structures"),
+      upgrades: document.getElementById("upgrades"),
+      achievements: document.getElementById("achievements"),
+      log: document.getElementById("log"),
+    };
+
+    function format(num) {
+      if (num < 1000) return num.toFixed(1).replace(/\.0$/, "");
+      const units = ["K", "M", "B", "T", "Qa", "Qi"];
+      let value = num;
+      let idx = -1;
+      while (value >= 1000 && idx < units.length - 1) {
+        value /= 1000;
+        idx += 1;
+      }
+      return `${value.toFixed(2)}${units[idx]}`;
+    }
+
+    function rankFromMana(totalMana) {
+      if (totalMana >= 1200000) return "Grand Archmage";
+      if (totalMana >= 300000) return "Archmage";
+      if (totalMana >= 90000) return "Master";
+      if (totalMana >= 20000) return "Adept";
+      if (totalMana >= 3000) return "Scholar";
+      if (totalMana >= 400) return "Initiate";
+      return "Novice";
+    }
+
+    function addLog(message, klass = "") {
+      const stamped = `[${new Date().toLocaleTimeString()}] ${message}`;
+      state.log.unshift({ text: stamped, klass });
+      state.log = state.log.slice(0, 90);
+    }
+
+    function getStructureCost(key, levelOffset = 0) {
+      const data = structureData[key];
+      const level = state.structures[key] + levelOffset;
+      return Math.floor(data.baseCost * Math.pow(data.growth, level));
+    }
+
+    function getBulkStructureCost(key, amount) {
+      let total = 0;
+      for (let i = 0; i < amount; i += 1) {
+        total += getStructureCost(key, i);
+      }
+      return total;
+    }
+
+    function productionMultiplier() {
+      let mult = 1;
+      if (state.upgrades.leylineBinding) mult *= 1.25;
+      if (state.upgrades.crystallizedThought) mult *= 1.5;
+      if (state.achievements.mana1k) mult *= 1.05;
+      if (state.achievements.mana20k) mult *= 1.1;
+      return mult;
+    }
+
+    function getMps() {
+      let total = 0;
+      for (const [key, amount] of Object.entries(state.structures)) {
+        total += amount * structureData[key].mps;
+      }
+      return total * productionMultiplier();
+    }
+
+    function canAfford(cost) {
+      return state.mana >= cost;
+    }
+
+    function buyStructure(key) {
+      const amount = state.buyAmount;
+      const totalCost = getBulkStructureCost(key, amount);
+      if (!canAfford(totalCost)) return;
+
+      state.mana -= totalCost;
+      state.structures[key] += amount;
+      addLog(`Purchased ${amount} ${structureData[key].name}${amount > 1 ? "s" : ""}.`, "ok");
+      checkAchievements();
+      render();
+    }
+
+    function buyUpgrade(key) {
+      const up = upgradeData[key];
+      if (state.upgrades[key] || !canAfford(up.cost)) return;
+      state.mana -= up.cost;
+      state.upgrades[key] = true;
+      up.apply(state);
+      addLog(`Learned upgrade: ${up.name}. ${up.effect}`, "ok");
+      render();
+    }
+
+    function unlockAchievement(key) {
+      if (state.achievements[key]) return;
+      state.achievements[key] = true;
+      const achievement = achievementData.find((a) => a.key === key);
+      if (key === "golem3") state.clickPower += 15;
+      addLog(`Achievement unlocked: ${achievement.name} (${achievement.reward})`, "ok");
+    }
+
+    function checkAchievements() {
+      for (const achievement of achievementData) {
+        if (!state.achievements[achievement.key] && achievement.test(state)) {
+          unlockAchievement(achievement.key);
+        }
+      }
+    }
+
+    function castSpell() {
+      state.mana += state.clickPower;
+      state.totalMana += state.clickPower;
+      checkAchievements();
+      render();
+    }
+
+    function saveGame(showToast = true) {
+      const payload = { ...state, lastTick: Date.now(), log: state.log.slice(0, 60) };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      state.lastSavedAt = Date.now();
+      if (showToast) addLog("Game saved.", "ok");
+      render();
+    }
+
+    function normalizeLoadedState(data) {
+      state.mana = Number(data.mana || 0);
+      state.totalMana = Number(data.totalMana || 0);
+      state.clickPower = Number(data.clickPower || 1);
+      state.buyAmount = [1, 10, 25].includes(Number(data.buyAmount)) ? Number(data.buyAmount) : 1;
+
+      for (const key of Object.keys(state.structures)) {
+        state.structures[key] = Number(data.structures?.[key] || 0);
+      }
+      for (const key of Object.keys(state.upgrades)) {
+        state.upgrades[key] = Boolean(data.upgrades?.[key]);
+      }
+      for (const key of Object.keys(state.achievements)) {
+        state.achievements[key] = Boolean(data.achievements?.[key]);
+      }
+
+      state.log = Array.isArray(data.log) && data.log.length
+        ? data.log.map((entry) => (typeof entry === "string" ? { text: entry, klass: "" } : entry))
+        : [{ text: "Welcome back, wizard.", klass: "" }];
+    }
+
+    function applyOfflineProgress(previousTick) {
+      if (!previousTick) return;
+      const elapsedSeconds = Math.min((Date.now() - previousTick) / 1000, 6 * 60 * 60);
+      if (elapsedSeconds <= 2) return;
+      const gained = getMps() * elapsedSeconds;
+      if (gained <= 0) return;
+
+      state.mana += gained;
+      state.totalMana += gained;
+      addLog(`You were away for ${Math.floor(elapsedSeconds)}s and gained ${format(gained)} mana.`, "warn");
+    }
+
+    function loadGame() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+
+      try {
+        const parsed = JSON.parse(raw);
+        const previousTick = Number(parsed.lastTick);
+        normalizeLoadedState(parsed);
+        applyOfflineProgress(previousTick);
+        state.lastTick = Date.now();
+        addLog("Save loaded.", "ok");
+      } catch {
+        addLog("Save file corrupted. Starting fresh.", "danger");
+      }
+    }
+
+    function resetGame() {
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+    }
+
+    function renderStructures() {
+      els.structures.innerHTML = "";
+      for (const [key, data] of Object.entries(structureData)) {
+        const owned = state.structures[key];
+        const nextCost = getStructureCost(key, 0);
+        const bulkCost = getBulkStructureCost(key, state.buyAmount);
+        const disabled = !canAfford(bulkCost);
+
+        const card = document.createElement("div");
+        card.className = "item";
+        card.innerHTML = `
+          <div>
+            <div class="name">${data.name} <span class="pill">Owned: ${owned}</span></div>
+            <div class="meta">+${format(data.mps)}/sec each • Next: ${format(nextCost)} mana</div>
+            <div class="meta">Buy ${state.buyAmount}: ${format(bulkCost)} mana</div>
+          </div>
+          <button ${disabled ? "disabled" : ""}>Buy x${state.buyAmount}</button>
+        `;
+
+        card.querySelector("button").onclick = () => buyStructure(key);
+        els.structures.appendChild(card);
+      }
+    }
+
+    function renderUpgrades() {
+      els.upgrades.innerHTML = "";
+      for (const [key, up] of Object.entries(upgradeData)) {
+        const unlocked = state.upgrades[key];
+        const disabled = unlocked || !canAfford(up.cost);
+        const card = document.createElement("div");
+        card.className = "item";
+        card.innerHTML = `
+          <div>
+            <div class="name">${up.name} ${unlocked ? '<span class="pill">Learned</span>' : ""}</div>
+            <div class="meta">${up.effect} • Cost: ${format(up.cost)} mana</div>
+          </div>
+          <button ${disabled ? "disabled" : ""}>${unlocked ? "Done" : "Research"}</button>
+        `;
+        card.querySelector("button").onclick = () => buyUpgrade(key);
+        els.upgrades.appendChild(card);
+      }
+    }
+
+    function renderAchievements() {
+      els.achievements.innerHTML = "";
+      for (const achievement of achievementData) {
+        const unlocked = state.achievements[achievement.key];
+        const card = document.createElement("div");
+        card.className = "item";
+        card.innerHTML = `
+          <div>
+            <div class="name">${achievement.name} ${unlocked ? '<span class="pill">Unlocked</span>' : ""}</div>
+            <div class="meta">Reward: ${achievement.reward}</div>
+          </div>
+          <button disabled>${unlocked ? "Done" : "Locked"}</button>
+        `;
+        els.achievements.appendChild(card);
+      }
+    }
+
+    function renderLog() {
+      els.log.innerHTML = state.log
+        .map((entry) => `<div class="${entry.klass || ""}">${entry.text}</div>`)
+        .join("");
+    }
+
+    function render() {
+      const mps = getMps();
+      els.mana.textContent = format(state.mana);
+      els.totalMana.textContent = format(state.totalMana);
+      els.mps.textContent = format(mps);
+      els.rank.textContent = rankFromMana(state.totalMana);
+      els.clickPower.textContent = format(state.clickPower);
+      els.buyAmountLabel.textContent = `x${state.buyAmount}`;
+
+      if (state.lastSavedAt) {
+        const age = Math.max(0, Math.floor((Date.now() - state.lastSavedAt) / 1000));
+        els.saveState.textContent = `${age}s ago`;
+      } else {
+        els.saveState.textContent = "Not saved";
+      }
+
+      for (const btn of els.buyToggle.querySelectorAll("button")) {
+        btn.classList.toggle("active", Number(btn.dataset.buy) === state.buyAmount);
+      }
+
+      renderStructures();
+      renderUpgrades();
+      renderAchievements();
+      renderLog();
+    }
+
+    function gameLoop() {
+      const now = Date.now();
+      const delta = Math.min((now - state.lastTick) / 1000, 1);
+      state.lastTick = now;
+      const gain = getMps() * delta;
+      if (gain > 0) {
+        state.mana += gain;
+        state.totalMana += gain;
+        checkAchievements();
+      }
+      render();
+    }
+
+    els.castBtn.addEventListener("click", castSpell);
+    els.saveBtn.addEventListener("click", () => saveGame(true));
+    els.resetBtn.addEventListener("click", () => {
+      if (confirm("Reset all progress?")) resetGame();
+    });
+    els.buyToggle.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLButtonElement)) return;
+      const amount = Number(target.dataset.buy);
+      if (![1, 10, 25].includes(amount)) return;
+      state.buyAmount = amount;
+      render();
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.code === "Space") {
+        event.preventDefault();
+        castSpell();
+      }
+    });
+
+    loadGame();
+    render();
+    setInterval(gameLoop, 200);
+    setInterval(() => saveGame(false), AUTO_SAVE_MS);
+  </script>
+</body>
+</html>
