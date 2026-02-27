@@ -874,6 +874,11 @@
       }
     });
 
-    <script type="module" src="js/main.js"></script>
+    loadGame();
+    checkAchievements();
+    render();
+    setInterval(gameLoop, 100);
+    setInterval(() => saveGame(false), AUTO_SAVE_MS);
+  </script>
   </body>
 </html>
