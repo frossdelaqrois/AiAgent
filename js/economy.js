@@ -3,7 +3,10 @@ import { generatorDefs } from './generators.js';
 export const upgradeDefs = [
   { id: 'runes', name: 'Empowered Runes', cost: 350, mult: 1.35, text: 'Generators +35%', art: 'assets/icons/mana-crystal.svg' },
   { id: 'staff', name: 'Soul Staff', cost: 3200, mult: 1.75, text: 'Generators +75%', art: 'assets/icons/wizard-sigil.svg' },
-  { id: 'leyline', name: 'Leyline Binding', cost: 25000, mult: 2.4, text: 'Generators +140%', art: 'assets/icons/arcane-star.svg' }
+  { id: 'leyline', name: 'Leyline Binding', cost: 25000, mult: 2.4, text: 'Generators +140%', art: 'assets/icons/arcane-star.svg' },
+  { id: 'constellation', name: 'Constellation Lattice', cost: 4200000, mult: 3.1, text: 'Generators +210%', art: 'assets/icons/arcane-star.svg' },
+  { id: 'echoforge', name: 'Echoforge Cores', cost: 950000000, mult: 4.4, text: 'Generators +340%', art: 'assets/icons/mana-crystal.svg' },
+  { id: 'divinity', name: 'Crown of Divinity', cost: 180000000000, mult: 6.8, text: 'Generators +580%', art: 'assets/icons/wizard-sigil.svg' }
 ];
 
 export function productionPerSecond(state, spellBoost = 1) {
