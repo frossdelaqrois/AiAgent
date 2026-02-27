@@ -115,13 +115,22 @@
 
     .item {
       display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 8px;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
       align-items: center;
       background: rgba(255,255,255,0.05);
       border-radius: 10px;
       border: 1px solid rgba(255,255,255,0.1);
       padding: 10px;
+    }
+
+    .item-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.22);
+      object-fit: cover;
+      background: rgba(255,255,255,0.08);
     }
 
     .name { font-weight: 700; }
@@ -233,12 +242,23 @@
     const STORAGE_KEY = "arcane-idle-save-v2";
     const AUTO_SAVE_MS = 20000;
 
+
+    function svgIcon(label, colorA, colorB, glyph) {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="${label}">
+`
+        + `<defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stop-color="${colorA}"/><stop offset="100%" stop-color="${colorB}"/></linearGradient></defs>`
+        + `<rect x="2" y="2" width="60" height="60" rx="12" fill="url(#g)"/>`
+        + `<text x="32" y="39" text-anchor="middle" font-size="25" font-family="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, sans-serif">${glyph}</text>`
+        + `</svg>`;
+      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    }
+
     const structureData = {
-      apprentice: { name: "Apprentice", baseCost: 15, mps: 0.6, growth: 1.15 },
-      crystal: { name: "Mana Crystal", baseCost: 100, mps: 4, growth: 1.16 },
-      library: { name: "Enchanted Library", baseCost: 550, mps: 22, growth: 1.18 },
-      golem: { name: "Arcane Golem", baseCost: 2600, mps: 95, growth: 1.2 },
-      observatory: { name: "Astral Observatory", baseCost: 11000, mps: 440, growth: 1.23 },
+      apprentice: { name: "Apprentice", baseCost: 15, mps: 0.6, growth: 1.15, image: svgIcon("Apprentice", "#7852ff", "#4ec0ff", "🧙") },
+      crystal: { name: "Mana Crystal", baseCost: 100, mps: 4, growth: 1.16, image: svgIcon("Mana Crystal", "#6f58ff", "#3cc4f4", "🔷") },
+      library: { name: "Enchanted Library", baseCost: 550, mps: 22, growth: 1.18, image: svgIcon("Enchanted Library", "#9362ff", "#4cc6a8", "📚") },
+      golem: { name: "Arcane Golem", baseCost: 2600, mps: 95, growth: 1.2, image: svgIcon("Arcane Golem", "#8a6a55", "#4a7aa3", "🗿") },
+      observatory: { name: "Astral Observatory", baseCost: 11000, mps: 440, growth: 1.23, image: svgIcon("Astral Observatory", "#4b4f9f", "#51bde8", "🔭") },
     };
 
     const upgradeData = {
@@ -246,32 +266,36 @@
         name: "Focused Wand",
         cost: 60,
         effect: "Double click power",
+        image: svgIcon("Focused Wand", "#7a5cff", "#36a7ff", "🪄"),
         apply: (state) => state.clickPower *= 2,
       },
       dualChanneling: {
         name: "Dual Channeling",
         cost: 450,
         effect: "Clicks gain +8 mana",
+        image: svgIcon("Dual Channeling", "#8f62ff", "#46c0f8", "✨"),
         apply: (state) => state.clickPower += 8,
       },
       leylineBinding: {
         name: "Leyline Binding",
         cost: 1400,
         effect: "All structures produce +25% mana",
+        image: svgIcon("Leyline Binding", "#4d75d4", "#5ecf95", "🕸️"),
         apply: () => {},
       },
       crystallizedThought: {
         name: "Crystallized Thought",
         cost: 6000,
         effect: "All structures produce +50% mana",
+        image: svgIcon("Crystallized Thought", "#5e7ad0", "#86dbff", "💎"),
         apply: () => {},
       },
     };
 
     const achievementData = [
-      { key: "mana1k", name: "Mana Hoarder I", test: (s) => s.totalMana >= 1000, reward: "+5% structure output" },
-      { key: "mana20k", name: "Mana Hoarder II", test: (s) => s.totalMana >= 20000, reward: "+10% structure output" },
-      { key: "golem3", name: "Golem Battalion", test: (s) => s.structures.golem >= 3, reward: "+15 click power" },
+      { key: "mana1k", name: "Mana Hoarder I", image: svgIcon("Mana Hoarder I", "#4f69d9", "#57c8f2", "🥉"), test: (s) => s.totalMana >= 1000, reward: "+5% structure output" },
+      { key: "mana20k", name: "Mana Hoarder II", image: svgIcon("Mana Hoarder II", "#6f62d0", "#58d4d2", "🥈"), test: (s) => s.totalMana >= 20000, reward: "+10% structure output" },
+      { key: "golem3", name: "Golem Battalion", image: svgIcon("Golem Battalion", "#7c5e90", "#4ca2c2", "🏅"), test: (s) => s.structures.golem >= 3, reward: "+15 click power" },
     ];
 
     const state = {
@@ -486,6 +510,7 @@
         const card = document.createElement("div");
         card.className = "item";
         card.innerHTML = `
+          <img class="item-icon" src="${data.image}" alt="${data.name} icon" />
           <div>
             <div class="name">${data.name} <span class="pill">Owned: ${owned}</span></div>
             <div class="meta">+${format(data.mps)}/sec each • Next: ${format(nextCost)} mana</div>
@@ -507,6 +532,7 @@
         const card = document.createElement("div");
         card.className = "item";
         card.innerHTML = `
+          <img class="item-icon" src="${up.image}" alt="${up.name} icon" />
           <div>
             <div class="name">${up.name} ${unlocked ? '<span class="pill">Learned</span>' : ""}</div>
             <div class="meta">${up.effect} • Cost: ${format(up.cost)} mana</div>
@@ -525,6 +551,7 @@
         const card = document.createElement("div");
         card.className = "item";
         card.innerHTML = `
+          <img class="item-icon" src="${achievement.image}" alt="${achievement.name} icon" />
           <div>
             <div class="name">${achievement.name} ${unlocked ? '<span class="pill">Unlocked</span>' : ""}</div>
             <div class="meta">Reward: ${achievement.reward}</div>
