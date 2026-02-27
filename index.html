@@ -254,11 +254,11 @@
     }
 
     const structureData = {
-      apprentice: { name: "Apprentice", baseCost: 15, mps: 0.6, growth: 1.15, image: svgIcon("Apprentice", "#7852ff", "#4ec0ff", "🧙") },
-      crystal: { name: "Mana Crystal", baseCost: 100, mps: 4, growth: 1.16, image: svgIcon("Mana Crystal", "#6f58ff", "#3cc4f4", "🔷") },
-      library: { name: "Enchanted Library", baseCost: 550, mps: 22, growth: 1.18, image: svgIcon("Enchanted Library", "#9362ff", "#4cc6a8", "📚") },
-      golem: { name: "Arcane Golem", baseCost: 2600, mps: 95, growth: 1.2, image: svgIcon("Arcane Golem", "#8a6a55", "#4a7aa3", "🗿") },
-      observatory: { name: "Astral Observatory", baseCost: 11000, mps: 440, growth: 1.23, image: svgIcon("Astral Observatory", "#4b4f9f", "#51bde8", "🔭") },
+      apprentice: { name: "Apprentice", baseCost: 15, mps: 0.6, growth: 1.15, image: svgIcon("Apprentice", "#7852ff", "#4ec0ff", "🧙"), tooltip: "Apprentices channel basic mana streams and are your first source of passive mana income." },
+      crystal: { name: "Mana Crystal", baseCost: 100, mps: 4, growth: 1.16, image: svgIcon("Mana Crystal", "#6f58ff", "#3cc4f4", "🔷"), tooltip: "Mana Crystals store ambient arcane power to sharply increase mana per second." },
+      library: { name: "Enchanted Library", baseCost: 550, mps: 22, growth: 1.18, image: svgIcon("Enchanted Library", "#9362ff", "#4cc6a8", "📚"), tooltip: "Enchanted Libraries unlock efficient spellcraft methods that multiply your idle gains." },
+      golem: { name: "Arcane Golem", baseCost: 2600, mps: 95, growth: 1.2, image: svgIcon("Arcane Golem", "#8a6a55", "#4a7aa3", "🗿"), tooltip: "Arcane Golems automate heavy magical labor and massively boost production." },
+      observatory: { name: "Astral Observatory", baseCost: 11000, mps: 440, growth: 1.23, image: svgIcon("Astral Observatory", "#4b4f9f", "#51bde8", "🔭"), tooltip: "Astral Observatories align your tower with leylines for elite mana generation." },
     };
 
     const upgradeData = {
@@ -267,6 +267,7 @@
         cost: 60,
         effect: "Double click power",
         image: svgIcon("Focused Wand", "#7a5cff", "#36a7ff", "🪄"),
+        tooltip: "Focused Wand strengthens each manual cast, making every click worth twice as much mana.",
         apply: (state) => state.clickPower *= 2,
       },
       dualChanneling: {
@@ -274,6 +275,7 @@
         cost: 450,
         effect: "Clicks gain +8 mana",
         image: svgIcon("Dual Channeling", "#8f62ff", "#46c0f8", "✨"),
+        tooltip: "Dual Channeling weaves two spells at once so each cast adds a large flat mana bonus.",
         apply: (state) => state.clickPower += 8,
       },
       leylineBinding: {
@@ -281,6 +283,7 @@
         cost: 1400,
         effect: "All structures produce +25% mana",
         image: svgIcon("Leyline Binding", "#4d75d4", "#5ecf95", "🕸️"),
+        tooltip: "Leyline Binding anchors your tower to nearby leylines, increasing all structure output.",
         apply: () => {},
       },
       crystallizedThought: {
@@ -288,14 +291,15 @@
         cost: 6000,
         effect: "All structures produce +50% mana",
         image: svgIcon("Crystallized Thought", "#5e7ad0", "#86dbff", "💎"),
+        tooltip: "Crystallized Thought refines magical focus, delivering a major global boost to structures.",
         apply: () => {},
       },
     };
 
     const achievementData = [
-      { key: "mana1k", name: "Mana Hoarder I", image: svgIcon("Mana Hoarder I", "#4f69d9", "#57c8f2", "🥉"), test: (s) => s.totalMana >= 1000, reward: "+5% structure output" },
-      { key: "mana20k", name: "Mana Hoarder II", image: svgIcon("Mana Hoarder II", "#6f62d0", "#58d4d2", "🥈"), test: (s) => s.totalMana >= 20000, reward: "+10% structure output" },
-      { key: "golem3", name: "Golem Battalion", image: svgIcon("Golem Battalion", "#7c5e90", "#4ca2c2", "🏅"), test: (s) => s.structures.golem >= 3, reward: "+15 click power" },
+      { key: "mana1k", name: "Mana Hoarder I", image: svgIcon("Mana Hoarder I", "#4f69d9", "#57c8f2", "🥉"), test: (s) => s.totalMana >= 1000, requirement: "Accumulate 1,000 total mana from any source.", reward: "+5% structure output", tooltip: "First hoarding milestone. Keep casting and buying structures until lifetime mana hits 1,000." },
+      { key: "mana20k", name: "Mana Hoarder II", image: svgIcon("Mana Hoarder II", "#6f62d0", "#58d4d2", "🥈"), test: (s) => s.totalMana >= 20000, requirement: "Accumulate 20,000 total mana over the run.", reward: "+10% structure output", tooltip: "Advanced hoarding milestone. Scale production and idle income to reach 20,000 lifetime mana." },
+      { key: "golem3", name: "Golem Battalion", image: svgIcon("Golem Battalion", "#7c5e90", "#4ca2c2", "🏅"), test: (s) => s.structures.golem >= 3, requirement: "Own 3 Arcane Golems at the same time.", reward: "+15 click power", tooltip: "Construct three Arcane Golems to earn this badge and permanently strengthen manual casting." },
     ];
 
     const state = {
@@ -510,7 +514,7 @@
         const card = document.createElement("div");
         card.className = "item";
         card.innerHTML = `
-          <img class="item-icon" src="${data.image}" alt="${data.name} icon" />
+          <img class="item-icon" src="${data.image}" alt="${data.name} icon" title="${data.tooltip}" />
           <div>
             <div class="name">${data.name} <span class="pill">Owned: ${owned}</span></div>
             <div class="meta">+${format(data.mps)}/sec each • Next: ${format(nextCost)} mana</div>
@@ -532,7 +536,7 @@
         const card = document.createElement("div");
         card.className = "item";
         card.innerHTML = `
-          <img class="item-icon" src="${up.image}" alt="${up.name} icon" />
+          <img class="item-icon" src="${up.image}" alt="${up.name} icon" title="${up.tooltip}" />
           <div>
             <div class="name">${up.name} ${unlocked ? '<span class="pill">Learned</span>' : ""}</div>
             <div class="meta">${up.effect} • Cost: ${format(up.cost)} mana</div>
@@ -551,9 +555,10 @@
         const card = document.createElement("div");
         card.className = "item";
         card.innerHTML = `
-          <img class="item-icon" src="${achievement.image}" alt="${achievement.name} icon" />
+          <img class="item-icon" src="${achievement.image}" alt="${achievement.name} icon" title="${achievement.tooltip}" />
           <div>
             <div class="name">${achievement.name} ${unlocked ? '<span class="pill">Unlocked</span>' : ""}</div>
+            <div class="meta">How to unlock: ${achievement.requirement}</div>
             <div class="meta">Reward: ${achievement.reward}</div>
           </div>
           <button disabled>${unlocked ? "Done" : "Locked"}</button>
