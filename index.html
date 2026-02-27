@@ -276,7 +276,7 @@
     }
 
     .scroll-shop {
-      max-height: 360px;
+      max-height: 320px;
       overflow: auto;
       padding-right: 4px;
       border: 1px solid rgba(255, 192, 106, 0.25);
@@ -321,6 +321,11 @@
     </section>
 
     <section class="panel">
+      <h2>🔮 Upgrades</h2>
+      <div id="upgrades" class="shop scroll-shop"></div>
+    </section>
+
+    <section class="panel">
       <h2>🧪 Structures</h2>
       <div class="buy-toggle" id="buyToggle">
         <button data-buy="1" class="active">x1</button>
@@ -334,13 +339,8 @@
     <section class="panel">
       <h2>⚔️ Spells</h2>
       <div id="spells" class="spell-grid"></div>
-    </section>
-
-    <section class="panel">
-      <h2>🔮 Upgrades</h2>
-      <div id="upgrades" class="shop scroll-shop"></div>
       <h3 style="margin-top: 16px;">🏆 Achievements</h3>
-      <div id="achievements" class="shop"></div>
+      <div id="achievements" class="shop scroll-shop"></div>
     </section>
 
     <section class="panel wide">
@@ -455,7 +455,13 @@
     const achievementData = [
       { key: "mana1k", name: "Mana Hoarder I", image: svgIcon("Mana Hoarder I", "#4f69d9", "#57c8f2", "🥉"), test: (s) => s.totalMana >= 1000, requirement: "Accumulate 1,000 total mana from any source.", reward: "+5% structure output", tooltip: "First hoarding milestone. Keep casting and buying structures until lifetime mana hits 1,000." },
       { key: "mana20k", name: "Mana Hoarder II", image: svgIcon("Mana Hoarder II", "#6f62d0", "#58d4d2", "🥈"), test: (s) => s.totalMana >= 20000, requirement: "Accumulate 20,000 total mana over the run.", reward: "+10% structure output", tooltip: "Advanced hoarding milestone. Scale production and idle income to reach 20,000 lifetime mana." },
+      { key: "mana250k", name: "Mana Hoarder III", image: svgIcon("Mana Hoarder III", "#5e7ad0", "#57dbd5", "🥇"), test: (s) => s.totalMana >= 250000, requirement: "Accumulate 250,000 total mana.", reward: "+15% structure output", tooltip: "A mid-game mastery checkpoint that rewards sustained scaling." },
+      { key: "mana2m", name: "Mana Sovereign", image: svgIcon("Mana Sovereign", "#d2a645", "#7b39ff", "👑"), test: (s) => s.totalMana >= 2000000, requirement: "Accumulate 2,000,000 total mana.", reward: "+25% structure output", tooltip: "A late milestone for long sessions, requiring a truly automated tower." },
       { key: "golem3", name: "Golem Battalion", image: svgIcon("Golem Battalion", "#7c5e90", "#4ca2c2", "🏅"), test: (s) => s.structures.golem >= 3, requirement: "Own 3 Arcane Golems at the same time.", reward: "+15 click power", tooltip: "Construct three Arcane Golems to earn this badge and permanently strengthen manual casting." },
+      { key: "towerTycoon", name: "Tower Tycoon", image: svgIcon("Tower Tycoon", "#5f78d1", "#b270ff", "🏗️"), test: (s) => Object.values(s.structures).reduce((sum, amount) => sum + amount, 0) >= 80, requirement: "Own 80 total structures.", reward: "+20% structure output", tooltip: "Rewards broad investment across your whole structure roster." },
+      { key: "skyLord", name: "Lord of the Sky", image: svgIcon("Lord of the Sky", "#62c5ff", "#7d7fff", "🏰"), test: (s) => s.structures.skyCitadel >= 5, requirement: "Own 5 Sky Citadels.", reward: "+15% spell power", tooltip: "Your floating strongholds improve spell efficiency across all casts." },
+      { key: "spellweaver", name: "Spellweaver", image: svgIcon("Spellweaver", "#35b6ff", "#f0bb5e", "📘"), test: (s) => s.spellCasts >= 250, requirement: "Cast 250 spells in total.", reward: "-10% spell costs", tooltip: "Dedicated casting lowers spell maintenance costs permanently." },
+      { key: "voidCaller", name: "Void Caller", image: svgIcon("Void Caller", "#4f2d89", "#0f0627", "🌌"), test: (s) => s.structures.voidReactor >= 2, requirement: "Own 2 Void Reactors.", reward: "+40 click power", tooltip: "A deep-end milestone that empowers manual burst play in the late game." },
     ];
 
     const state = {
@@ -546,6 +552,9 @@
       if (state.upgrades.archmageSigil) mult *= 2.2;
       if (state.achievements.mana1k) mult *= 1.05;
       if (state.achievements.mana20k) mult *= 1.1;
+      if (state.achievements.mana250k) mult *= 1.15;
+      if (state.achievements.mana2m) mult *= 1.25;
+      if (state.achievements.towerTycoon) mult *= 1.2;
       return mult;
     }
 
@@ -561,7 +570,8 @@
     function spellCost(key) {
       const base = spellData[key].manaCost;
       const reduction = state.upgrades.manaCompression ? 0.8 : 1;
-      return Math.floor(base * reduction);
+      const masteryDiscount = state.achievements.spellweaver ? 0.9 : 1;
+      return Math.floor(base * reduction * masteryDiscount);
     }
 
     function spellPower(key) {
@@ -569,6 +579,7 @@
       if (key === "bolt") power = Math.max(power, state.clickPower);
       if (state.upgrades.runeEtching) power *= 1.3;
       if (state.upgrades.tempestMastery && (key === "lightning" || key === "meteor")) power *= 1.9;
+      if (state.achievements.skyLord) power *= 1.15;
       return power;
     }
 
@@ -607,6 +618,7 @@
       state.achievements[key] = true;
       const achievement = achievementData.find((a) => a.key === key);
       if (key === "golem3") state.clickPower += 15;
+      if (key === "voidCaller") state.clickPower += 40;
       addLog(`Achievement unlocked: ${achievement.name} (${achievement.reward})`, "ok");
     }
 
