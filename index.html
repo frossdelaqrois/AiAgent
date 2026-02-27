@@ -354,27 +354,24 @@
     const AUTO_SAVE_MS = 20000;
 
 
-    function svgIcon(label, colorA, colorB, glyph) {
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-label="${label}">`
-        + `<defs><linearGradient id="g" x1="0" x2="1" y1="0" y2="1"><stop offset="0%" stop-color="${colorA}"/><stop offset="100%" stop-color="${colorB}"/></linearGradient><radialGradient id="r" cx="50%" cy="40%" r="60%"><stop offset="0%" stop-color="#ffffff" stop-opacity="0.35"/><stop offset="100%" stop-color="#000000" stop-opacity="0"/></radialGradient></defs>`
-        + `<rect x="3" y="3" width="90" height="90" rx="18" fill="url(#g)"/>`
-        + `<rect x="7" y="7" width="82" height="82" rx="14" fill="url(#r)"/>`
-        + `<circle cx="48" cy="48" r="33" fill="rgba(8,8,18,0.3)"/>`
-        + `<text x="48" y="59" text-anchor="middle" font-size="38" font-family="Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, sans-serif">${glyph}</text>`
-        + `</svg>`;
-      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    function webIcon(glyph) {
+      const codepoint = Array.from(glyph)
+        .map((char) => char.codePointAt(0).toString(16))
+        .filter((code) => code !== "fe0f")
+        .join("-");
+      return `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/${codepoint}.png`;
     }
 
     const structureData = {
-      apprentice: { name: "Apprentice", baseCost: 15, mps: 0.6, growth: 1.15, image: svgIcon("Apprentice", "#7852ff", "#4ec0ff", "🧙"), tooltip: "Apprentices channel basic mana streams and are your first source of passive mana income." },
-      crystal: { name: "Mana Crystal", baseCost: 100, mps: 4, growth: 1.16, image: svgIcon("Mana Crystal", "#6f58ff", "#3cc4f4", "🔷"), tooltip: "Mana Crystals store ambient arcane power to sharply increase mana per second." },
-      library: { name: "Enchanted Library", baseCost: 550, mps: 22, growth: 1.18, image: svgIcon("Enchanted Library", "#9362ff", "#4cc6a8", "📚"), tooltip: "Enchanted Libraries unlock efficient spellcraft methods that multiply your idle gains." },
-      golem: { name: "Arcane Golem", baseCost: 2600, mps: 95, growth: 1.2, image: svgIcon("Arcane Golem", "#8a6a55", "#4a7aa3", "🗿"), tooltip: "Arcane Golems automate heavy magical labor and massively boost production." },
-      observatory: { name: "Astral Observatory", baseCost: 11000, mps: 440, growth: 1.23, image: svgIcon("Astral Observatory", "#4b4f9f", "#51bde8", "🔭"), tooltip: "Astral Observatories align your tower with leylines for elite mana generation." },
-      manaForge: { name: "Mana Forge", baseCost: 42000, mps: 1650, growth: 1.24, image: svgIcon("Mana Forge", "#ff8d39", "#c93624", "🔥"), tooltip: "A blazing forge that condenses raw arcana into high-output power cores." },
-      portalNexus: { name: "Portal Nexus", baseCost: 140000, mps: 5200, growth: 1.26, image: svgIcon("Portal Nexus", "#1e89e8", "#7f35e6", "🌀"), tooltip: "Portal arrays siphon mana from nearby dimensions." },
-      skyCitadel: { name: "Sky Citadel", baseCost: 420000, mps: 18000, growth: 1.27, image: svgIcon("Sky Citadel", "#4cb2ff", "#a676ff", "🏰"), tooltip: "Floating mage-citadels create massive autonomous arcane output." },
-      voidReactor: { name: "Void Reactor", baseCost: 1300000, mps: 63000, growth: 1.29, image: svgIcon("Void Reactor", "#6233bd", "#1b0f40", "🌌"), tooltip: "Harnesses dark-space turbulence for late-game production spikes." },
+      apprentice: { name: "Apprentice", baseCost: 15, mps: 0.6, growth: 1.15, image: webIcon("🧙"), tooltip: "Apprentices channel basic mana streams and are your first source of passive mana income." },
+      crystal: { name: "Mana Crystal", baseCost: 100, mps: 4, growth: 1.16, image: webIcon("🔷"), tooltip: "Mana Crystals store ambient arcane power to sharply increase mana per second." },
+      library: { name: "Enchanted Library", baseCost: 550, mps: 22, growth: 1.18, image: webIcon("📚"), tooltip: "Enchanted Libraries unlock efficient spellcraft methods that multiply your idle gains." },
+      golem: { name: "Arcane Golem", baseCost: 2600, mps: 95, growth: 1.2, image: webIcon("🗿"), tooltip: "Arcane Golems automate heavy magical labor and massively boost production." },
+      observatory: { name: "Astral Observatory", baseCost: 11000, mps: 440, growth: 1.23, image: webIcon("🔭"), tooltip: "Astral Observatories align your tower with leylines for elite mana generation." },
+      manaForge: { name: "Mana Forge", baseCost: 42000, mps: 1650, growth: 1.24, image: webIcon("🔥"), tooltip: "A blazing forge that condenses raw arcana into high-output power cores." },
+      portalNexus: { name: "Portal Nexus", baseCost: 140000, mps: 5200, growth: 1.26, image: webIcon("🌀"), tooltip: "Portal arrays siphon mana from nearby dimensions." },
+      skyCitadel: { name: "Sky Citadel", baseCost: 420000, mps: 18000, growth: 1.27, image: webIcon("🏰"), tooltip: "Floating mage-citadels create massive autonomous arcane output." },
+      voidReactor: { name: "Void Reactor", baseCost: 1300000, mps: 63000, growth: 1.29, image: webIcon("🌌"), tooltip: "Harnesses dark-space turbulence for late-game production spikes." },
     };
 
         const upgradeData = {
@@ -382,7 +379,7 @@
         name: "Focused Wand",
         cost: 60,
         effect: "Double Arcane Bolt power",
-        image: svgIcon("Focused Wand", "#7a5cff", "#36a7ff", "🪄"),
+        image: webIcon("🪄"),
         tooltip: "Focused Wand strengthens each manual cast, making every click worth twice as much mana.",
         apply: (state) => state.clickPower *= 2,
       },
@@ -390,7 +387,7 @@
         name: "Dual Channeling",
         cost: 450,
         effect: "Arcane Bolt gains +8 power",
-        image: svgIcon("Dual Channeling", "#8f62ff", "#46c0f8", "✨"),
+        image: webIcon("✨"),
         tooltip: "Dual Channeling weaves two spells at once so each cast adds a large flat mana bonus.",
         apply: (state) => state.clickPower += 8,
       },
@@ -398,7 +395,7 @@
         name: "Rune Etching",
         cost: 1200,
         effect: "All spell power +30%",
-        image: svgIcon("Rune Etching", "#ad6cff", "#4ed8ff", "✴️"),
+        image: webIcon("🔯"),
         tooltip: "Arcane runes amplify the impact of every offensive cast.",
         apply: () => {},
       },
@@ -406,7 +403,7 @@
         name: "Mana Compression",
         cost: 4200,
         effect: "Spell costs -20%",
-        image: svgIcon("Mana Compression", "#1f95ff", "#7044ff", "🧿"),
+        image: webIcon("🧿"),
         tooltip: "Dense mana channels reduce the mana needed to cast heavy spells.",
         apply: () => {},
       },
@@ -414,7 +411,7 @@
         name: "Leyline Binding",
         cost: 1400,
         effect: "All structures produce +25% mana",
-        image: svgIcon("Leyline Binding", "#4d75d4", "#5ecf95", "🕸️"),
+        image: webIcon("🧬"),
         tooltip: "Leyline Binding anchors your tower to nearby leylines, increasing all structure output.",
         apply: () => {},
       },
@@ -422,7 +419,7 @@
         name: "Crystallized Thought",
         cost: 6000,
         effect: "All structures produce +50% mana",
-        image: svgIcon("Crystallized Thought", "#5e7ad0", "#86dbff", "💎"),
+        image: webIcon("💎"),
         tooltip: "Crystallized Thought refines magical focus, delivering a major global boost to structures.",
         apply: () => {},
       },
@@ -430,7 +427,7 @@
         name: "Archmage Sigil",
         cost: 26000,
         effect: "All structures produce +120% mana",
-        image: svgIcon("Archmage Sigil", "#ffcd65", "#7b39ff", "🜂"),
+        image: webIcon("🔱"),
         tooltip: "An ancient sigil that supercharges every mana engine in your empire.",
         apply: () => {},
       },
@@ -438,30 +435,54 @@
         name: "Tempest Mastery",
         cost: 90000,
         effect: "Lightning and Meteor spells +90% power",
-        image: svgIcon("Tempest Mastery", "#29a7ff", "#f0bb5e", "⚡"),
+        image: webIcon("⚡"),
         tooltip: "Mastery over storm magic dramatically boosts high-tier burst spells.",
+        apply: () => {},
+      },
+      planarRefinery: {
+        name: "Planar Refinery",
+        cost: 350000,
+        effect: "All structures produce +180% mana",
+        image: webIcon("🏭"),
+        tooltip: "Distills planar residue into endless fuel for your late-game production chain.",
+        apply: () => {},
+      },
+      celestialLattice: {
+        name: "Celestial Lattice",
+        cost: 1200000,
+        effect: "All spell power +120%",
+        image: webIcon("🌠"),
+        tooltip: "Interlocks starlight and sigils so every spell detonates with vastly greater force.",
+        apply: () => {},
+      },
+      singularityCore: {
+        name: "Singularity Core",
+        cost: 4500000,
+        effect: "All structures produce +300% mana and spell costs -25%",
+        image: webIcon("🕳️"),
+        tooltip: "A compressed void-kernel that warps production and dramatically improves spell efficiency.",
         apply: () => {},
       },
     };
 
         const spellData = {
-      bolt: { name: "Arcane Bolt", basePower: 1, manaCost: 0, unlockAt: 0, image: svgIcon("Arcane Bolt", "#6f53ff", "#4ec6ff", "✨") },
-      fireball: { name: "Fireball", basePower: 40, manaCost: 30, unlockAt: 300, image: svgIcon("Fireball", "#ff8f3f", "#b71e16", "🔥") },
-      lightning: { name: "Chain Lightning", basePower: 175, manaCost: 120, unlockAt: 2500, image: svgIcon("Chain Lightning", "#35b6ff", "#5868ff", "⚡") },
-      meteor: { name: "Meteor Strike", basePower: 800, manaCost: 620, unlockAt: 14000, image: svgIcon("Meteor Strike", "#ffd36f", "#ff622f", "☄️") },
-      voidburst: { name: "Void Burst", basePower: 3200, manaCost: 2600, unlockAt: 70000, image: svgIcon("Void Burst", "#4f2d89", "#0f0627", "🕳️") },
+      bolt: { name: "Arcane Bolt", basePower: 1, manaCost: 0, unlockAt: 0, image: webIcon("✨") },
+      fireball: { name: "Fireball", basePower: 40, manaCost: 30, unlockAt: 300, image: webIcon("🔥") },
+      lightning: { name: "Chain Lightning", basePower: 175, manaCost: 120, unlockAt: 2500, image: webIcon("⚡") },
+      meteor: { name: "Meteor Strike", basePower: 800, manaCost: 620, unlockAt: 14000, image: webIcon("🌠") },
+      voidburst: { name: "Void Burst", basePower: 3200, manaCost: 2600, unlockAt: 70000, image: webIcon("🌀") },
     };
 
     const achievementData = [
-      { key: "mana1k", name: "Mana Hoarder I", image: svgIcon("Mana Hoarder I", "#4f69d9", "#57c8f2", "🥉"), test: (s) => s.totalMana >= 1000, requirement: "Accumulate 1,000 total mana from any source.", reward: "+5% structure output", tooltip: "First hoarding milestone. Keep casting and buying structures until lifetime mana hits 1,000." },
-      { key: "mana20k", name: "Mana Hoarder II", image: svgIcon("Mana Hoarder II", "#6f62d0", "#58d4d2", "🥈"), test: (s) => s.totalMana >= 20000, requirement: "Accumulate 20,000 total mana over the run.", reward: "+10% structure output", tooltip: "Advanced hoarding milestone. Scale production and idle income to reach 20,000 lifetime mana." },
-      { key: "mana250k", name: "Mana Hoarder III", image: svgIcon("Mana Hoarder III", "#5e7ad0", "#57dbd5", "🥇"), test: (s) => s.totalMana >= 250000, requirement: "Accumulate 250,000 total mana.", reward: "+15% structure output", tooltip: "A mid-game mastery checkpoint that rewards sustained scaling." },
-      { key: "mana2m", name: "Mana Sovereign", image: svgIcon("Mana Sovereign", "#d2a645", "#7b39ff", "👑"), test: (s) => s.totalMana >= 2000000, requirement: "Accumulate 2,000,000 total mana.", reward: "+25% structure output", tooltip: "A late milestone for long sessions, requiring a truly automated tower." },
-      { key: "golem3", name: "Golem Battalion", image: svgIcon("Golem Battalion", "#7c5e90", "#4ca2c2", "🏅"), test: (s) => s.structures.golem >= 3, requirement: "Own 3 Arcane Golems at the same time.", reward: "+15 click power", tooltip: "Construct three Arcane Golems to earn this badge and permanently strengthen manual casting." },
-      { key: "towerTycoon", name: "Tower Tycoon", image: svgIcon("Tower Tycoon", "#5f78d1", "#b270ff", "🏗️"), test: (s) => Object.values(s.structures).reduce((sum, amount) => sum + amount, 0) >= 80, requirement: "Own 80 total structures.", reward: "+20% structure output", tooltip: "Rewards broad investment across your whole structure roster." },
-      { key: "skyLord", name: "Lord of the Sky", image: svgIcon("Lord of the Sky", "#62c5ff", "#7d7fff", "🏰"), test: (s) => s.structures.skyCitadel >= 5, requirement: "Own 5 Sky Citadels.", reward: "+15% spell power", tooltip: "Your floating strongholds improve spell efficiency across all casts." },
-      { key: "spellweaver", name: "Spellweaver", image: svgIcon("Spellweaver", "#35b6ff", "#f0bb5e", "📘"), test: (s) => s.spellCasts >= 250, requirement: "Cast 250 spells in total.", reward: "-10% spell costs", tooltip: "Dedicated casting lowers spell maintenance costs permanently." },
-      { key: "voidCaller", name: "Void Caller", image: svgIcon("Void Caller", "#4f2d89", "#0f0627", "🌌"), test: (s) => s.structures.voidReactor >= 2, requirement: "Own 2 Void Reactors.", reward: "+40 click power", tooltip: "A deep-end milestone that empowers manual burst play in the late game." },
+      { key: "mana1k", name: "Mana Hoarder I", image: webIcon("🥉"), test: (s) => s.totalMana >= 1000, requirement: "Accumulate 1,000 total mana from any source.", reward: "+5% structure output", tooltip: "First hoarding milestone. Keep casting and buying structures until lifetime mana hits 1,000." },
+      { key: "mana20k", name: "Mana Hoarder II", image: webIcon("🥈"), test: (s) => s.totalMana >= 20000, requirement: "Accumulate 20,000 total mana over the run.", reward: "+10% structure output", tooltip: "Advanced hoarding milestone. Scale production and idle income to reach 20,000 lifetime mana." },
+      { key: "mana250k", name: "Mana Hoarder III", image: webIcon("🥇"), test: (s) => s.totalMana >= 250000, requirement: "Accumulate 250,000 total mana.", reward: "+15% structure output", tooltip: "A mid-game mastery checkpoint that rewards sustained scaling." },
+      { key: "mana2m", name: "Mana Sovereign", image: webIcon("👑"), test: (s) => s.totalMana >= 2000000, requirement: "Accumulate 2,000,000 total mana.", reward: "+25% structure output", tooltip: "A late milestone for long sessions, requiring a truly automated tower." },
+      { key: "golem3", name: "Golem Battalion", image: webIcon("🏅"), test: (s) => s.structures.golem >= 3, requirement: "Own 3 Arcane Golems at the same time.", reward: "+15 click power", tooltip: "Construct three Arcane Golems to earn this badge and permanently strengthen manual casting." },
+      { key: "towerTycoon", name: "Tower Tycoon", image: webIcon("🏛️"), test: (s) => Object.values(s.structures).reduce((sum, amount) => sum + amount, 0) >= 80, requirement: "Own 80 total structures.", reward: "+20% structure output", tooltip: "Rewards broad investment across your whole structure roster." },
+      { key: "skyLord", name: "Lord of the Sky", image: webIcon("🏰"), test: (s) => s.structures.skyCitadel >= 5, requirement: "Own 5 Sky Citadels.", reward: "+15% spell power", tooltip: "Your floating strongholds improve spell efficiency across all casts." },
+      { key: "spellweaver", name: "Spellweaver", image: webIcon("📘"), test: (s) => s.spellCasts >= 250, requirement: "Cast 250 spells in total.", reward: "-10% spell costs", tooltip: "Dedicated casting lowers spell maintenance costs permanently." },
+      { key: "voidCaller", name: "Void Caller", image: webIcon("🌌"), test: (s) => s.structures.voidReactor >= 2, requirement: "Own 2 Void Reactors.", reward: "+40 click power", tooltip: "A deep-end milestone that empowers manual burst play in the late game." },
     ];
 
     const state = {
@@ -550,6 +571,8 @@
       if (state.upgrades.leylineBinding) mult *= 1.25;
       if (state.upgrades.crystallizedThought) mult *= 1.5;
       if (state.upgrades.archmageSigil) mult *= 2.2;
+      if (state.upgrades.planarRefinery) mult *= 2.8;
+      if (state.upgrades.singularityCore) mult *= 4;
       if (state.achievements.mana1k) mult *= 1.05;
       if (state.achievements.mana20k) mult *= 1.1;
       if (state.achievements.mana250k) mult *= 1.15;
@@ -570,8 +593,9 @@
     function spellCost(key) {
       const base = spellData[key].manaCost;
       const reduction = state.upgrades.manaCompression ? 0.8 : 1;
+      const singularityDiscount = state.upgrades.singularityCore ? 0.75 : 1;
       const masteryDiscount = state.achievements.spellweaver ? 0.9 : 1;
-      return Math.floor(base * reduction * masteryDiscount);
+      return Math.floor(base * reduction * singularityDiscount * masteryDiscount);
     }
 
     function spellPower(key) {
@@ -579,6 +603,7 @@
       if (key === "bolt") power = Math.max(power, state.clickPower);
       if (state.upgrades.runeEtching) power *= 1.3;
       if (state.upgrades.tempestMastery && (key === "lightning" || key === "meteor")) power *= 1.9;
+      if (state.upgrades.celestialLattice) power *= 2.2;
       if (state.achievements.skyLord) power *= 1.15;
       return power;
     }
@@ -599,7 +624,6 @@
       state.mana -= totalCost;
       state.structures[key] += amount;
       addLog(`Purchased ${amount} ${structureData[key].name}${amount > 1 ? "s" : ""}.`, "ok");
-      checkAchievements();
       render();
     }
 
@@ -622,12 +646,16 @@
       addLog(`Achievement unlocked: ${achievement.name} (${achievement.reward})`, "ok");
     }
 
-    function checkAchievements() {
-      for (const achievement of achievementData) {
-        if (!state.achievements[achievement.key] && achievement.test(state)) {
-          unlockAchievement(achievement.key);
-        }
-      }
+    function canClaimAchievement(key) {
+      const achievement = achievementData.find((entry) => entry.key === key);
+      if (!achievement || state.achievements[key]) return false;
+      return achievement.test(state);
+    }
+
+    function claimAchievement(key) {
+      if (!canClaimAchievement(key)) return;
+      unlockAchievement(key);
+      render();
     }
 
     function castSpell(spellKey = state.activeSpell) {
@@ -644,7 +672,6 @@
       if (state.spellCasts % 25 === 0) {
         addLog(`Arcane rhythm! ${state.spellCasts} spells cast so far.`, "warn");
       }
-      checkAchievements();
       render();
     }
 
@@ -732,6 +759,13 @@
           <button ${disabled ? "disabled" : ""}>Buy x${state.buyAmount}</button>
         `;
 
+        card.onclick = (event) => {
+          if (event.target.tagName === "BUTTON" || event.target.closest("button")) {
+            buyStructure(key);
+            return;
+          }
+          if (!disabled) buyStructure(key);
+        };
         card.querySelector("button").onclick = () => buyStructure(key);
         els.structures.appendChild(card);
       }
@@ -752,6 +786,13 @@
           </div>
           <button ${disabled ? "disabled" : ""}>${unlocked ? "Done" : "Research"}</button>
         `;
+        card.onclick = (event) => {
+          if (event.target.tagName === "BUTTON" || event.target.closest("button")) {
+            buyUpgrade(key);
+            return;
+          }
+          if (!disabled) buyUpgrade(key);
+        };
         card.querySelector("button").onclick = () => buyUpgrade(key);
         els.upgrades.appendChild(card);
       }
@@ -807,8 +848,16 @@
             <div class="meta">How to unlock: ${achievement.requirement}</div>
             <div class="meta">Reward: ${achievement.reward}</div>
           </div>
-          <button disabled>${unlocked ? "Done" : "Locked"}</button>
+          <button ${unlocked || !achievement.test(state) ? "disabled" : ""}>${unlocked ? "Done" : achievement.test(state) ? "Claim" : "Locked"}</button>
         `;
+        card.onclick = (event) => {
+          if (event.target.tagName === "BUTTON" || event.target.closest("button")) {
+            claimAchievement(achievement.key);
+            return;
+          }
+          if (!unlocked && achievement.test(state)) claimAchievement(achievement.key);
+        };
+        card.querySelector("button").onclick = () => claimAchievement(achievement.key);
         els.achievements.appendChild(card);
       }
     }
@@ -860,7 +909,6 @@
       if (gain > 0) {
         state.mana += gain;
         state.totalMana += gain;
-        checkAchievements();
       }
       render();
     }
@@ -887,7 +935,6 @@
     });
 
     loadGame();
-    checkAchievements();
     render();
     setInterval(gameLoop, 100);
     setInterval(() => saveGame(false), AUTO_SAVE_MS);
