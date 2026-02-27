@@ -246,6 +246,48 @@
       margin-top: 8px;
     }
 
+    .quickslot-bar {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+      gap: 8px;
+    }
+
+    .quickslot {
+      border: 1px solid rgba(255, 202, 125, 0.52);
+      border-radius: 10px;
+      background: linear-gradient(180deg, rgba(36, 18, 41, 0.92), rgba(13, 10, 20, 0.95));
+      color: var(--text);
+      padding: 6px;
+      display: grid;
+      gap: 4px;
+      align-items: center;
+      justify-items: center;
+      min-height: 74px;
+    }
+
+    .quickslot .slot-key {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .quickslot img {
+      width: 30px;
+      height: 30px;
+      border-radius: 7px;
+      border: 1px solid rgba(186, 225, 255, 0.55);
+      background: rgba(0, 0, 0, 0.35);
+    }
+
+    .quickslot .slot-cost {
+      font-size: 0.72rem;
+      color: var(--muted);
+    }
+
+    .quickslot.active {
+      box-shadow: 0 0 0 2px rgba(159, 67, 255, 0.65) inset;
+    }
+
     .spell-card {
       display: grid;
       gap: 8px;
@@ -317,7 +359,7 @@
         <div class="resource"><span>🔷 Mana Pool</span><b id="manaMirror">0</b></div>
         <div class="resource"><span>💜 Arcane Crystal Stock</span><b id="crystalMirror">0</b></div>
       </div>
-      <div class="tiny">Tip: Press <strong>spacebar</strong> to cast your selected spell quickly.</div>
+      <div class="tiny">Tip: Press <strong>Space</strong> to cast your selected spell, or use <strong>1-5</strong> to cast spells directly from quickslots.</div>
     </section>
 
     <section class="panel">
@@ -339,6 +381,7 @@
     <section class="panel">
       <h2>⚔️ Spells</h2>
       <div id="spells" class="spell-grid"></div>
+      <div id="quickslots" class="quickslot-bar"></div>
       <h3 style="margin-top: 16px;">🏆 Achievements</h3>
       <div id="achievements" class="shop scroll-shop"></div>
     </section>
@@ -473,6 +516,8 @@
       voidburst: { name: "Void Burst", basePower: 3200, manaCost: 2600, unlockAt: 70000, image: webIcon("🌀") },
     };
 
+    const spellQuickslotOrder = ["bolt", "fireball", "lightning", "meteor", "voidburst"];
+
     const achievementData = [
       { key: "mana1k", name: "Mana Hoarder I", image: webIcon("🥉"), test: (s) => s.totalMana >= 1000, requirement: "Accumulate 1,000 total mana from any source.", reward: "+5% structure output", tooltip: "First hoarding milestone. Keep casting and buying structures until lifetime mana hits 1,000." },
       { key: "mana20k", name: "Mana Hoarder II", image: webIcon("🥈"), test: (s) => s.totalMana >= 20000, requirement: "Accumulate 20,000 total mana over the run.", reward: "+10% structure output", tooltip: "Advanced hoarding milestone. Scale production and idle income to reach 20,000 lifetime mana." },
@@ -515,6 +560,7 @@
       spellPower: document.getElementById("spellPower"),
       castBtn: document.getElementById("castBtn"),
       spells: document.getElementById("spells"),
+      quickslots: document.getElementById("quickslots"),
       saveBtn: document.getElementById("saveBtn"),
       resetBtn: document.getElementById("resetBtn"),
       buyToggle: document.getElementById("buyToggle"),
@@ -759,14 +805,12 @@
           <button ${disabled ? "disabled" : ""}>Buy x${state.buyAmount}</button>
         `;
 
-        card.onclick = (event) => {
-          if (event.target.tagName === "BUTTON" || event.target.closest("button")) {
-            buyStructure(key);
-            return;
-          }
-          if (!disabled) buyStructure(key);
-        };
-        card.querySelector("button").onclick = () => buyStructure(key);
+        const buyButton = card.querySelector("button");
+        buyButton.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          buyStructure(key);
+        });
         els.structures.appendChild(card);
       }
     }
@@ -786,14 +830,12 @@
           </div>
           <button ${disabled ? "disabled" : ""}>${unlocked ? "Done" : "Research"}</button>
         `;
-        card.onclick = (event) => {
-          if (event.target.tagName === "BUTTON" || event.target.closest("button")) {
-            buyUpgrade(key);
-            return;
-          }
-          if (!disabled) buyUpgrade(key);
-        };
-        card.querySelector("button").onclick = () => buyUpgrade(key);
+        const upgradeButton = card.querySelector("button");
+        upgradeButton.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          buyUpgrade(key);
+        });
         els.upgrades.appendChild(card);
       }
     }
@@ -823,8 +865,17 @@
           </div>
         `;
 
-        card.querySelector('[data-action="select"]').onclick = () => { state.activeSpell = key; render(); };
-        card.querySelector('[data-action="cast"]').onclick = () => castSpell(key);
+        const selectButton = card.querySelector('[data-action="select"]');
+        const castButton = card.querySelector('[data-action="cast"]');
+        selectButton.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          state.activeSpell = key;
+          render();
+        });
+        castButton.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          castSpell(key);
+        });
         if (!unlocked) {
           const req = document.createElement("div");
           req.className = "spell-mini";
@@ -832,6 +883,35 @@
           card.appendChild(req);
         }
         els.spells.appendChild(card);
+      }
+    }
+
+    function renderQuickslots() {
+      els.quickslots.innerHTML = "";
+      for (let idx = 0; idx < spellQuickslotOrder.length; idx += 1) {
+        const key = spellQuickslotOrder[idx];
+        const spell = spellData[key];
+        if (!spell) continue;
+        const unlocked = isSpellUnlocked(key);
+        const cost = spellCost(key);
+        const canCast = unlocked && canAfford(cost);
+
+        const slot = document.createElement("button");
+        slot.type = "button";
+        slot.className = `quickslot ${state.activeSpell === key ? "active" : ""}`;
+        slot.disabled = !canCast;
+        slot.innerHTML = `
+          <span class="slot-key">${idx + 1}</span>
+          <img src="${spell.image}" alt="${spell.name} icon" />
+          <span>${spell.name}</span>
+          <span class="slot-cost">${unlocked ? format(cost) + " mana" : "Locked"}</span>
+        `;
+        slot.title = unlocked ? `Cast ${spell.name}` : `Unlock at ${format(spell.unlockAt)} total mana`;
+        slot.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          castSpell(key);
+        });
+        els.quickslots.appendChild(slot);
       }
     }
 
@@ -850,14 +930,12 @@
           </div>
           <button ${unlocked || !achievement.test(state) ? "disabled" : ""}>${unlocked ? "Done" : achievement.test(state) ? "Claim" : "Locked"}</button>
         `;
-        card.onclick = (event) => {
-          if (event.target.tagName === "BUTTON" || event.target.closest("button")) {
-            claimAchievement(achievement.key);
-            return;
-          }
-          if (!unlocked && achievement.test(state)) claimAchievement(achievement.key);
-        };
-        card.querySelector("button").onclick = () => claimAchievement(achievement.key);
+        const claimButton = card.querySelector("button");
+        claimButton.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          claimAchievement(achievement.key);
+        });
         els.achievements.appendChild(card);
       }
     }
@@ -897,6 +975,7 @@
       renderStructures();
       renderUpgrades();
       renderSpells();
+      renderQuickslots();
       renderAchievements();
       renderLog();
     }
@@ -931,6 +1010,15 @@
       if (event.code === "Space") {
         event.preventDefault();
         castSpell();
+        return;
+      }
+
+      if (event.code.startsWith("Digit")) {
+        const slotNumber = Number(event.code.slice(5));
+        if (slotNumber >= 1 && slotNumber <= spellQuickslotOrder.length) {
+          event.preventDefault();
+          castSpell(spellQuickslotOrder[slotNumber - 1]);
+        }
       }
     });
 
