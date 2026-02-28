@@ -510,6 +510,12 @@
       gap: 8px;
     }
 
+    .quickslot-wrap {
+      display: grid;
+      gap: 6px;
+      align-content: start;
+    }
+
     .quickslot {
       border: 1px solid rgba(255, 202, 125, 0.52);
       border-radius: 10px;
@@ -543,6 +549,11 @@
 
     .quickslot.active {
       box-shadow: 0 0 0 2px rgba(159, 67, 255, 0.65) inset;
+    }
+
+    .quickslot-assign {
+      font-size: 0.66rem;
+      padding: 6px 4px;
     }
 
     .td-grid {
@@ -831,7 +842,7 @@
         </div>
         <div class="resource"><span>🔷 Spell Mana</span><b id="manaMirror">0</b></div>
       </div>
-      <div class="tiny">Tip: Click a quickslot to assign a learned spell. Press <strong>1-5</strong> to cast from a specific slot. <strong>Space</strong> still casts the selected slot.</div>
+      <div class="tiny">Tip: Click a quickslot to cast. Use the <strong>Assign</strong> button under each slot to change its spell. Press <strong>1-5</strong> to cast from a specific slot. <strong>Space</strong> still casts the selected slot.</div>
       <div class="tiny">Selected: <strong id="activeSpellName">Arcane Spell 1</strong> • Effect: <span id="spellPower">+0 power/sec</span> • Time: <span id="spellTime">ready</span></div>
     </section>
 
@@ -2394,6 +2405,9 @@
         const cost = spell ? spellCost(key) : 0;
         const canCast = spell && unlocked && canAffordMana(cost);
 
+        const slotWrap = document.createElement("div");
+        slotWrap.className = "quickslot-wrap";
+
         const slot = document.createElement("button");
         slot.type = "button";
         slot.className = `quickslot ${state.activeQuickslot === idx ? "active" : ""}`;
@@ -2403,15 +2417,31 @@
           <span>${spell ? spell.name : "Empty Slot"}</span>
           <span class="slot-cost">${spell ? (unlocked ? `${format(cost)} mana • ${activeSpellRemainingMs(key) > 0 ? `${(activeSpellRemainingMs(key) / 1000).toFixed(1)}s left` : `${spell.durationSec.toFixed(0)}s duration`}` : `Unlock Lv ${spell.unlockLevel}`) : "Click to assign"}</span>
         `;
-        slot.title = spell ? (unlocked ? `Cast ${spell.name}` : `Unlock at level ${spell.unlockLevel}`) : "Assign a spell";
+        slot.title = spell ? (unlocked ? `Cast ${spell.name}` : `Unlock at level ${spell.unlockLevel}`) : "No spell assigned";
         slot.addEventListener("pointerdown", (event) => {
           event.preventDefault();
           state.activeQuickslot = idx;
-          openSpellSlotModal(idx);
+          castSpell(state.quickslots[idx]);
+          render();
         });
         slot.disabled = false;
         if (spell && !canCast) slot.classList.add("disabled");
-        els.quickslots.appendChild(slot);
+
+        const assignBtn = document.createElement("button");
+        assignBtn.type = "button";
+        assignBtn.className = "btn-ghost quickslot-assign";
+        assignBtn.textContent = "Assign";
+        assignBtn.title = `Assign spell to slot ${idx + 1}`;
+        assignBtn.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          state.activeQuickslot = idx;
+          openSpellSlotModal(idx);
+        });
+
+        slotWrap.appendChild(slot);
+        slotWrap.appendChild(assignBtn);
+        els.quickslots.appendChild(slotWrap);
       }
     }
 
