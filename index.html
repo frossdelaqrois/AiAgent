@@ -238,6 +238,46 @@
       color: var(--gold);
     }
 
+    .achievement-popups {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      display: grid;
+      gap: 8px;
+      z-index: 999;
+      pointer-events: none;
+    }
+
+    .achievement-popup {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 220px;
+      max-width: 300px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 196, 97, 0.4);
+      background: linear-gradient(180deg, rgba(34, 19, 10, 0.95), rgba(14, 9, 5, 0.95));
+      box-shadow: 0 10px 18px rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      transform: translateY(6px);
+      animation: popup-in 0.25s ease forwards;
+    }
+
+    .achievement-popup img {
+      width: 34px;
+      height: 34px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 216, 147, 0.4);
+    }
+
+    @keyframes popup-in {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
 
     .spell-grid {
       display: grid;
@@ -350,12 +390,8 @@
         <div class="stat"><div class="label">Power / sec</div><div class="value" id="mps">0</div></div>
         <div class="stat"><div class="label">Arcane Rank</div><div class="value" id="rank">Novice</div></div>
         <div class="stat"><div class="label">Total Power Ever</div><div class="value" id="totalPower">0</div></div>
-        <div class="stat"><div class="label">Autosave</div><div class="value" id="saveState">Ready</div></div>
-        <div class="stat"><div class="label">Buy Amount</div><div class="value" id="buyAmountLabel">x1</div></div>
-        <div class="stat"><div class="label">Bolt Power</div><div class="value" id="clickPower">1</div></div>
       </div>
       <div class="resource-strips">
-        <div class="resource"><span>🪙 Gold Reserve</span><b id="goldMirror">0</b></div>
         <div class="resource"><span>⚡ Power Reserve</span><b id="powerMirror">0</b></div>
         <div class="resource"><span>🔷 Spell Mana</span><b id="manaMirror">0</b></div>
       </div>
@@ -394,6 +430,8 @@
       <div id="log"></div>
     </section>
   </main>
+
+  <div id="achievementPopups" class="achievement-popups" aria-live="polite"></div>
 
   <script>
     const STORAGE_KEY = "arcane-idle-save-v2";
@@ -554,14 +592,11 @@
       totalPower: document.getElementById("totalPower"),
       mps: document.getElementById("mps"),
       rank: document.getElementById("rank"),
-      clickPower: document.getElementById("clickPower"),
-      saveState: document.getElementById("saveState"),
-      buyAmountLabel: document.getElementById("buyAmountLabel"),
-      goldMirror: document.getElementById("goldMirror"),
       powerMirror: document.getElementById("powerMirror"),
       manaMirror: document.getElementById("manaMirror"),
       activeSpellName: document.getElementById("activeSpellName"),
       spellPower: document.getElementById("spellPower"),
+      achievementPopups: document.getElementById("achievementPopups"),
       castBtn: document.getElementById("castBtn"),
       quickslots: document.getElementById("quickslots"),
       saveBtn: document.getElementById("saveBtn"),
@@ -697,6 +732,7 @@
       if (key === "golem3") state.clickPower += 15;
       if (key === "voidCaller") state.clickPower += 40;
       addLog(`Achievement unlocked: ${achievement.name} (${achievement.reward})`, "ok");
+      showAchievementPopup(achievement);
     }
 
     function canClaimAchievement(key) {
@@ -709,6 +745,33 @@
       if (!canClaimAchievement(key)) return;
       unlockAchievement(key);
       render();
+    }
+
+    function autoUnlockAchievements() {
+      let changed = false;
+      for (const achievement of achievementData) {
+        if (!state.achievements[achievement.key] && achievement.test(state)) {
+          unlockAchievement(achievement.key);
+          changed = true;
+        }
+      }
+      return changed;
+    }
+
+    function showAchievementPopup(achievement) {
+      const popup = document.createElement("div");
+      popup.className = "achievement-popup";
+      popup.innerHTML = `
+        <img src="${achievement.image}" alt="${achievement.name} icon" />
+        <div>
+          <strong>Achievement Unlocked</strong>
+          <div>${achievement.name}</div>
+        </div>
+      `;
+      els.achievementPopups.appendChild(popup);
+      setTimeout(() => {
+        popup.remove();
+      }, 3200);
     }
 
     function castSpell(spellKey = state.activeSpell) {
@@ -891,14 +954,8 @@
             <div class="meta">How to unlock: ${achievement.requirement}</div>
             <div class="meta">Reward: ${achievement.reward}</div>
           </div>
-          <button ${unlocked || !achievement.test(state) ? "disabled" : ""}>${unlocked ? "Done" : achievement.test(state) ? "Claim" : "Locked"}</button>
+          <button disabled>${unlocked ? "Unlocked" : "Locked"}</button>
         `;
-        const claimButton = card.querySelector("button");
-        claimButton.addEventListener("pointerdown", (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          claimAchievement(achievement.key);
-        });
         els.achievements.appendChild(card);
       }
     }
@@ -916,20 +973,10 @@
       els.mps.textContent = format(mps);
       els.rank.textContent = rankFromPower(state.totalPower);
       const activeSpell = spellData[state.activeSpell] || spellData.bolt;
-      els.clickPower.textContent = format(state.clickPower);
-      els.buyAmountLabel.textContent = `x${state.buyAmount}`;
-      els.goldMirror.textContent = format(state.totalPower * 0.42 + 150);
       els.powerMirror.textContent = format(state.power);
       els.manaMirror.textContent = format(state.mana);
             els.activeSpellName.textContent = activeSpell.name;
       els.spellPower.textContent = `+${format(spellPower(state.activeSpell))} power`;
-
-      if (state.lastSavedAt) {
-        const age = Math.max(0, Math.floor((Date.now() - state.lastSavedAt) / 1000));
-        els.saveState.textContent = `${age}s ago`;
-      } else {
-        els.saveState.textContent = "Not saved";
-      }
 
       for (const btn of els.buyToggle.querySelectorAll("button")) {
         btn.classList.toggle("active", Number(btn.dataset.buy) === state.buyAmount);
@@ -952,6 +999,8 @@
         state.totalPower += gain;
         state.mana += gain * 0.25;
       }
+
+      autoUnlockAchievements();
       render();
     }
 
