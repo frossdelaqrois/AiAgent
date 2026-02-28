@@ -1871,6 +1871,11 @@
 
         return {
           enemyHudAnchor: worldToScreen([enemy.x, 0.32, enemy.z], camera),
+          damageAnchors: (scene.damageNumbers || []).map((num) => {
+            const damageWorld = pctToWorld(num.enemyPathPosition || scene.enemyPosition);
+            const rise = (num.age / Math.max(0.001, num.life)) * 0.22;
+            return worldToScreen([damageWorld.x, 0.24 + rise, damageWorld.z], camera);
+          }),
         };
       }
 
@@ -2214,6 +2219,7 @@
         value,
         x: position.x,
         y: position.y - 2,
+        enemyPathPosition: { x: position.x, y: position.y },
         life: 0.7,
         age: 0,
       });
@@ -3055,6 +3061,7 @@
         enemyPosition: enemyPos,
         lowPower: towerPowerLow,
         freezeSec: td.spellFreezeSec,
+        damageNumbers: td.damageNumbers,
         shots: td.visualShots.map((shot) => {
           const progress = Math.min(1, shot.age / Math.max(0.001, shot.life));
           return {
@@ -3078,9 +3085,15 @@
         els.tdEnemyUnit.style.top = `${enemyPos.y.toFixed(2)}%`;
         els.tdEnemyUnit.style.opacity = tdRenderer.available ? "0" : "1";
       }
-      els.tdDamageLayer.innerHTML = td.damageNumbers.map((num) => {
+      const projectedDamageAnchors = tdRenderData?.damageAnchors || [];
+      els.tdDamageLayer.innerHTML = td.damageNumbers.map((num, idx) => {
         const alpha = Math.max(0, 1 - (num.age / Math.max(0.001, num.life)));
-        return `<span class="td-damage" style="left:${num.x.toFixed(2)}%;top:${num.y.toFixed(2)}%;opacity:${alpha.toFixed(2)}">-${format(num.value)}</span>`;
+        const projected = projectedDamageAnchors[idx];
+        const x = projected?.x ?? (num.x / 100);
+        const y = projected?.y ?? (num.y / 100);
+        const clampedX = Math.max(0.02, Math.min(0.98, x));
+        const clampedY = Math.max(0.02, Math.min(0.98, y));
+        return `<span class="td-damage" style="left:${(clampedX * 100).toFixed(2)}%;top:${(clampedY * 100).toFixed(2)}%;opacity:${alpha.toFixed(2)}">-${format(num.value)}</span>`;
       }).join("");
       if (towerPowerLow) {
         const pct = Math.max(0, Math.min(100, powerRatio * 100));
