@@ -570,6 +570,48 @@
       margin: 8px 0;
     }
 
+    .td-battlefield {
+      position: relative;
+      height: 86px;
+      border-radius: 10px;
+      margin: 10px 0 8px;
+      border: 1px solid rgba(115, 196, 255, 0.32);
+      background: linear-gradient(180deg, rgba(9, 18, 32, 0.95), rgba(10, 9, 16, 0.95));
+      overflow: hidden;
+    }
+
+    .td-wave-fill {
+      position: absolute;
+      inset: 0;
+      width: 0;
+      background: linear-gradient(90deg, rgba(54, 165, 245, 0.42), rgba(159, 67, 255, 0.35));
+      transition: width 0.12s linear;
+    }
+
+    .td-wave-fill.low-power {
+      background: linear-gradient(90deg, rgba(255, 105, 77, 0.48), rgba(255, 186, 92, 0.35));
+    }
+
+    .td-tower-icon,
+    .td-enemy-icon {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 1.8rem;
+      filter: drop-shadow(0 0 7px rgba(0, 0, 0, 0.55));
+      z-index: 2;
+    }
+
+    .td-tower-icon { right: 8px; }
+    .td-enemy-icon { left: 8px; transition: left 0.12s linear; }
+
+    .td-power-warning {
+      font-size: 0.75rem;
+      color: #ffbf9e;
+      margin-top: 4px;
+      min-height: 1.1em;
+    }
+
     .td-progress {
       display: block;
       height: 100%;
@@ -758,9 +800,15 @@
       <div class="td-grid">
         <div class="td-lane">
           <div class="tiny">Wave <b id="tdWave">1</b> • Breaches <b id="tdBreaches">0</b> / 5</div>
+          <div class="td-battlefield">
+            <span id="tdWaveFill" class="td-wave-fill"></span>
+            <span id="tdEnemyIcon" class="td-enemy-icon">🌊</span>
+            <span class="td-tower-icon">🏰</span>
+          </div>
           <div class="td-track"><span id="tdProgress" class="td-progress"></span></div>
           <div class="tiny">Enemy HP</div>
           <div class="td-track"><span id="tdEnemyHp" class="td-progress"></span></div>
+          <div id="tdPowerWarning" class="td-power-warning"></div>
           <div id="tdEnemyInfo" class="td-enemy">A scouting wisp approaches...</div>
         </div>
         <div class="td-stats">
@@ -1326,6 +1374,9 @@
       tdDps: document.getElementById("tdDps"),
       tdSpellBonus: document.getElementById("tdSpellBonus"),
       tdReward: document.getElementById("tdReward"),
+      tdWaveFill: document.getElementById("tdWaveFill"),
+      tdEnemyIcon: document.getElementById("tdEnemyIcon"),
+      tdPowerWarning: document.getElementById("tdPowerWarning"),
       spellSlotModal: document.getElementById("spellSlotModal"),
       spellSlotModalTitle: document.getElementById("spellSlotModalTitle"),
       spellSlotModalBody: document.getElementById("spellSlotModalBody"),
@@ -1651,6 +1702,14 @@
       return 18 + (wave * 5);
     }
 
+    function tdRequiredPower(wave = state.towerDefense.wave) {
+      return 10 + (wave * 2.8);
+    }
+
+    function tdPowerRatio() {
+      return tdTowerDps() / Math.max(1, tdRequiredPower(state.towerDefense.wave));
+    }
+
     function spawnTdEnemy(nextWave = state.towerDefense.wave) {
       const hp = tdWaveValue(nextWave) * Math.pow(1.2, Math.max(0, nextWave - 1));
       state.towerDefense.enemyMaxHp = hp;
@@ -1663,7 +1722,9 @@
       if (state.towerDefense.spellFreezeSec > 0) {
         state.towerDefense.spellFreezeSec = Math.max(0, state.towerDefense.spellFreezeSec - delta);
       }
-      const speed = (0.025 + (state.towerDefense.wave * 0.0035)) * (state.towerDefense.spellFreezeSec > 0 ? 0.2 : 1);
+      const powerRatio = tdPowerRatio();
+      const breachPressure = powerRatio < 1 ? 1 + ((1 - powerRatio) * 0.9) : 1;
+      const speed = (0.025 + (state.towerDefense.wave * 0.0035)) * breachPressure * (state.towerDefense.spellFreezeSec > 0 ? 0.2 : 1);
       state.towerDefense.enemyProgress += speed * delta;
       state.towerDefense.enemyHp -= tdTowerDps() * delta;
 
@@ -2393,10 +2454,22 @@
       const progressPct = Math.max(0, Math.min(100, td.enemyProgress * 100));
       const rewardPower = td.enemyMaxHp * 1.6;
       const rewardMana = Math.max(1, td.wave * 1.15);
+      const requiredPower = tdRequiredPower(td.wave);
+      const powerRatio = tdPowerRatio();
+      const towerPowerLow = powerRatio < 1;
       els.tdWave.textContent = String(td.wave);
       els.tdBreaches.textContent = String(td.breaches);
       els.tdProgress.style.width = `${progressPct.toFixed(2)}%`;
       els.tdEnemyHp.style.width = `${hpPct.toFixed(2)}%`;
+      els.tdWaveFill.style.width = `${progressPct.toFixed(2)}%`;
+      els.tdEnemyIcon.style.left = `calc(${progressPct.toFixed(2)}% - 12px)`;
+      els.tdWaveFill.classList.toggle("low-power", towerPowerLow);
+      if (towerPowerLow) {
+        const pct = Math.max(0, Math.min(100, powerRatio * 100));
+        els.tdPowerWarning.textContent = `Tower power low (${pct.toFixed(0)}% of needed). Breach chance increased.`;
+      } else {
+        els.tdPowerWarning.textContent = `Tower power stable (${format(tdTowerDps())} / ${format(requiredPower)} recommended).`;
+      }
       if (td.breaches >= tdMaxBreaches) {
         els.tdEnemyInfo.textContent = "The barrier is overloaded (5 breaches). Keep casting and growing power, then refresh to restart this lane.";
       } else {
