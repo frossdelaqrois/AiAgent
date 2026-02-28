@@ -1,12 +1,15 @@
 import { generatorDefs } from './generators.js';
 
 export const upgradeDefs = [
-  { id: 'runes', name: 'Empowered Runes', cost: 350, mult: 1.35, text: 'Generators +35%', art: 'assets/icons/mana-crystal.svg' },
-  { id: 'staff', name: 'Soul Staff', cost: 3200, mult: 1.75, text: 'Generators +75%', art: 'assets/icons/wizard-sigil.svg' },
-  { id: 'leyline', name: 'Leyline Binding', cost: 25000, mult: 2.4, text: 'Generators +140%', art: 'assets/icons/arcane-star.svg' },
-  { id: 'constellation', name: 'Constellation Lattice', cost: 4200000, mult: 3.1, text: 'Generators +210%', art: 'assets/icons/arcane-star.svg' },
-  { id: 'echoforge', name: 'Echoforge Cores', cost: 950000000, mult: 4.4, text: 'Generators +340%', art: 'assets/icons/mana-crystal.svg' },
-  { id: 'divinity', name: 'Crown of Divinity', cost: 180000000000, mult: 6.8, text: 'Generators +580%', art: 'assets/icons/wizard-sigil.svg' }
+  { id: 'runes', name: 'Empowered Runes', cost: 380, mult: 1.3, text: 'Generators +30%', art: 'assets/icons/mana-crystal.svg' },
+  { id: 'staff', name: 'Soul Staff', cost: 3400, mult: 1.65, text: 'Generators +65%', art: 'assets/icons/wizard-sigil.svg' },
+  { id: 'leyline', name: 'Leyline Binding', cost: 31000, mult: 2.1, text: 'Generators +110%', art: 'assets/icons/arcane-star.svg' },
+  { id: 'aether-lens', name: 'Aether Lens', cost: 260000, mult: 1.9, text: 'Generators +90%', art: 'assets/icons/mana-crystal.svg' },
+  { id: 'constellation', name: 'Constellation Lattice', cost: 5600000, mult: 2.6, text: 'Generators +160%', art: 'assets/icons/arcane-star.svg' },
+  { id: 'runic-surge', name: 'Runic Surge Reactor', cost: 78000000, mult: 2.25, text: 'Generators +125%', art: 'assets/icons/wizard-sigil.svg' },
+  { id: 'echoforge', name: 'Echoforge Cores', cost: 1550000000, mult: 3.3, text: 'Generators +230%', art: 'assets/icons/mana-crystal.svg' },
+  { id: 'astral-loom', name: 'Astral Loom', cost: 23000000000, mult: 2.7, text: 'Generators +170%', art: 'assets/icons/arcane-star.svg' },
+  { id: 'divinity', name: 'Crown of Divinity', cost: 480000000000, mult: 4.8, text: 'Generators +380%', art: 'assets/icons/wizard-sigil.svg' }
 ];
 
 export function productionPerSecond(state, spellBoost = 1) {
@@ -18,7 +21,10 @@ export function productionPerSecond(state, spellBoost = 1) {
 }
 
 export function knowledgeGain(totalMana) {
-  return Math.floor((Math.sqrt(totalMana)) / 1000);
+  if (totalMana < 5e4) return 0;
+  const early = Math.sqrt(totalMana) / 1300;
+  const late = Math.log10(totalMana + 1) ** 3.2;
+  return Math.floor(early + late - 7.5);
 }
 
 export function formatNumber(value) {
