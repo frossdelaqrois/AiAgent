@@ -1563,13 +1563,10 @@
 
       const vertexShader = gl.createShader(gl.VERTEX_SHADER);
       gl.shaderSource(vertexShader, `
-        attribute vec2 a_position;
-        uniform vec2 u_resolution;
+        attribute vec3 a_position;
+        uniform mat4 u_matrix;
         void main() {
-          vec2 zeroToOne = a_position / u_resolution;
-          vec2 zeroToTwo = zeroToOne * 2.0;
-          vec2 clipSpace = zeroToTwo - 1.0;
-          gl_Position = vec4(clipSpace * vec2(1.0, -1.0), 0.0, 1.0);
+          gl_Position = u_matrix * vec4(a_position, 1.0);
         }
       `);
       gl.compileShader(vertexShader);
@@ -1591,12 +1588,14 @@
       gl.useProgram(program);
 
       const positionLocation = gl.getAttribLocation(program, "a_position");
-      const resolutionLocation = gl.getUniformLocation(program, "u_resolution");
+      const matrixLocation = gl.getUniformLocation(program, "u_matrix");
       const colorLocation = gl.getUniformLocation(program, "u_color");
       const positionBuffer = gl.createBuffer();
       gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
       gl.enableVertexAttribArray(positionLocation);
-      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+      gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
+      gl.enable(gl.DEPTH_TEST);
+      gl.enable(gl.CULL_FACE);
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
@@ -1618,59 +1617,112 @@
         { x: 84, y: 77 },
       ];
 
-      function drawTriangles(vertices, color) {
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
-        gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
-        gl.uniform4fv(colorLocation, color);
-        gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2);
-      }
-
-      function pctToPx(point) {
+      function pctToWorld(pointPct) {
         return {
-          x: (point.x / 100) * canvas.width,
-          y: (point.y / 100) * canvas.height,
+          x: ((pointPct.x / 100) * 2) - 1,
+          z: ((pointPct.y / 100) * 2) - 1,
         };
       }
 
-      function drawRect(x, y, width, height, color) {
-        const x2 = x + width;
-        const y2 = y + height;
-        drawTriangles([x, y, x2, y, x, y2, x, y2, x2, y, x2, y2], color);
+      function normalize(v) {
+        const m = Math.hypot(v[0], v[1], v[2]) || 1;
+        return [v[0] / m, v[1] / m, v[2] / m];
       }
 
-      function drawCircle(pointPct, radiusPx, color) {
-        const center = pctToPx(pointPct);
-        const segments = 20;
-        const vertices = [];
-        for (let i = 0; i < segments; i += 1) {
-          const a1 = (i / segments) * Math.PI * 2;
-          const a2 = ((i + 1) / segments) * Math.PI * 2;
-          vertices.push(
-            center.x, center.y,
-            center.x + Math.cos(a1) * radiusPx, center.y + Math.sin(a1) * radiusPx,
-            center.x + Math.cos(a2) * radiusPx, center.y + Math.sin(a2) * radiusPx,
-          );
+      function subtract(a, b) {
+        return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+      }
+
+      function cross(a, b) {
+        return [
+          (a[1] * b[2]) - (a[2] * b[1]),
+          (a[2] * b[0]) - (a[0] * b[2]),
+          (a[0] * b[1]) - (a[1] * b[0]),
+        ];
+      }
+
+      function perspective(fov, aspect, near, far) {
+        const f = 1 / Math.tan(fov / 2);
+        const rangeInv = 1 / (near - far);
+        return new Float32Array([
+          f / aspect, 0, 0, 0,
+          0, f, 0, 0,
+          0, 0, (near + far) * rangeInv, -1,
+          0, 0, near * far * rangeInv * 2, 0,
+        ]);
+      }
+
+      function lookAt(eye, target, up) {
+        const zAxis = normalize(subtract(eye, target));
+        const xAxis = normalize(cross(up, zAxis));
+        const yAxis = cross(zAxis, xAxis);
+
+        return new Float32Array([
+          xAxis[0], yAxis[0], zAxis[0], 0,
+          xAxis[1], yAxis[1], zAxis[1], 0,
+          xAxis[2], yAxis[2], zAxis[2], 0,
+          -((xAxis[0] * eye[0]) + (xAxis[1] * eye[1]) + (xAxis[2] * eye[2])),
+          -((yAxis[0] * eye[0]) + (yAxis[1] * eye[1]) + (yAxis[2] * eye[2])),
+          -((zAxis[0] * eye[0]) + (zAxis[1] * eye[1]) + (zAxis[2] * eye[2])),
+          1,
+        ]);
+      }
+
+      function multiplyMat4(a, b) {
+        const out = new Float32Array(16);
+        for (let row = 0; row < 4; row += 1) {
+          for (let col = 0; col < 4; col += 1) {
+            out[(row * 4) + col] =
+              (a[(row * 4) + 0] * b[col + 0]) +
+              (a[(row * 4) + 1] * b[col + 4]) +
+              (a[(row * 4) + 2] * b[col + 8]) +
+              (a[(row * 4) + 3] * b[col + 12]);
+          }
         }
-        drawTriangles(vertices, color);
+        return out;
       }
 
-      function drawSegment(aPct, bPct, widthPx, color) {
-        const a = pctToPx(aPct);
-        const b = pctToPx(bPct);
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const length = Math.hypot(dx, dy) || 1;
-        const nx = -dy / length;
-        const ny = dx / length;
-        const half = widthPx / 2;
-        drawTriangles([
-          a.x + nx * half, a.y + ny * half,
-          b.x + nx * half, b.y + ny * half,
-          a.x - nx * half, a.y - ny * half,
-          a.x - nx * half, a.y - ny * half,
-          b.x + nx * half, b.y + ny * half,
-          b.x - nx * half, b.y - ny * half,
-        ], color);
+      function drawTriangles(vertices, color, matrix) {
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
+        gl.uniformMatrix4fv(matrixLocation, false, matrix);
+        gl.uniform4fv(colorLocation, color);
+        gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 3);
+      }
+
+      function boxVertices(center, size) {
+        const [cx, cy, cz] = center;
+        const [sx, sy, sz] = [size[0] / 2, size[1] / 2, size[2] / 2];
+        const x0 = cx - sx; const x1 = cx + sx;
+        const y0 = cy - sy; const y1 = cy + sy;
+        const z0 = cz - sz; const z1 = cz + sz;
+        return [
+          x0, y0, z1, x1, y0, z1, x0, y1, z1, x0, y1, z1, x1, y0, z1, x1, y1, z1,
+          x1, y0, z0, x0, y0, z0, x1, y1, z0, x1, y1, z0, x0, y0, z0, x0, y1, z0,
+          x0, y0, z0, x0, y0, z1, x0, y1, z0, x0, y1, z0, x0, y0, z1, x0, y1, z1,
+          x1, y0, z1, x1, y0, z0, x1, y1, z1, x1, y1, z1, x1, y0, z0, x1, y1, z0,
+          x0, y1, z1, x1, y1, z1, x0, y1, z0, x0, y1, z0, x1, y1, z1, x1, y1, z0,
+          x0, y0, z0, x1, y0, z0, x0, y0, z1, x0, y0, z1, x1, y0, z0, x1, y0, z1,
+        ];
+      }
+
+      function sphereVertices(center, radius, segments = 10, rings = 8) {
+        const verts = [];
+        for (let ring = 0; ring < rings; ring += 1) {
+          const v0 = ring / rings;
+          const v1 = (ring + 1) / rings;
+          const phi0 = (v0 * Math.PI) - (Math.PI / 2);
+          const phi1 = (v1 * Math.PI) - (Math.PI / 2);
+          for (let seg = 0; seg < segments; seg += 1) {
+            const u0 = (seg / segments) * Math.PI * 2;
+            const u1 = ((seg + 1) / segments) * Math.PI * 2;
+            const p0 = [center[0] + (Math.cos(phi0) * Math.cos(u0) * radius), center[1] + (Math.sin(phi0) * radius), center[2] + (Math.cos(phi0) * Math.sin(u0) * radius)];
+            const p1 = [center[0] + (Math.cos(phi0) * Math.cos(u1) * radius), center[1] + (Math.sin(phi0) * radius), center[2] + (Math.cos(phi0) * Math.sin(u1) * radius)];
+            const p2 = [center[0] + (Math.cos(phi1) * Math.cos(u0) * radius), center[1] + (Math.sin(phi1) * radius), center[2] + (Math.cos(phi1) * Math.sin(u0) * radius)];
+            const p3 = [center[0] + (Math.cos(phi1) * Math.cos(u1) * radius), center[1] + (Math.sin(phi1) * radius), center[2] + (Math.cos(phi1) * Math.sin(u1) * radius)];
+            verts.push(...p0, ...p2, ...p1, ...p1, ...p2, ...p3);
+          }
+        }
+        return verts;
       }
 
       function pathSlice(progress) {
@@ -1689,33 +1741,76 @@
         return result;
       }
 
+      function segmentPrism(aPct, bPct, width, height) {
+        const a = pctToWorld(aPct);
+        const b = pctToWorld(bPct);
+        const dx = b.x - a.x;
+        const dz = b.z - a.z;
+        const len = Math.hypot(dx, dz) || 1;
+        const nx = -dz / len;
+        const nz = dx / len;
+        const hw = width / 2;
+        const y0 = -0.16;
+        const y1 = y0 + height;
+        const axl = [a.x + (nx * hw), y0, a.z + (nz * hw)];
+        const axr = [a.x - (nx * hw), y0, a.z - (nz * hw)];
+        const bxl = [b.x + (nx * hw), y0, b.z + (nz * hw)];
+        const bxr = [b.x - (nx * hw), y0, b.z - (nz * hw)];
+        const ayl = [axl[0], y1, axl[2]];
+        const ayr = [axr[0], y1, axr[2]];
+        const byl = [bxl[0], y1, bxl[2]];
+        const byr = [bxr[0], y1, bxr[2]];
+        return [
+          ...axl, ...bxl, ...ayl, ...ayl, ...bxl, ...byl,
+          ...bxr, ...axr, ...byr, ...byr, ...axr, ...ayr,
+          ...axr, ...axl, ...ayr, ...ayr, ...axl, ...ayl,
+          ...bxl, ...bxr, ...byl, ...byl, ...bxr, ...byr,
+          ...ayl, ...byl, ...ayr, ...ayr, ...byl, ...byr,
+          ...axr, ...bxr, ...axl, ...axl, ...bxr, ...bxl,
+        ];
+      }
+
       function render(scene) {
         resizeCanvas();
-        gl.clearColor(0.23, 0.45, 0.25, 1);
-        gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.clearColor(0.04, 0.05, 0.09, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        drawRect(0, 0, canvas.width, canvas.height * 0.22, [0.66, 0.83, 0.92, 0.28]);
+        const proj = perspective(Math.PI / 3.2, canvas.width / canvas.height, 0.1, 12);
+        const view = lookAt([0, 1.65, 2.2], [0.1, -0.14, 0.12], [0, 1, 0]);
+        const camera = multiplyMat4(proj, view);
+
+        drawTriangles(boxVertices([0, -0.28, 0], [2.3, 0.18, 2.3]), [0.16, 0.42, 0.2, 1], camera);
+
         for (let i = 0; i < pathPoints.length - 1; i += 1) {
-          drawSegment(pathPoints[i], pathPoints[i + 1], 30, scene.lowPower ? [0.55, 0.37, 0.2, 0.95] : [0.73, 0.56, 0.35, 0.95]);
+          drawTriangles(segmentPrism(pathPoints[i], pathPoints[i + 1], 0.22, 0.05), scene.lowPower ? [0.44, 0.31, 0.21, 1] : [0.62, 0.48, 0.32, 1], camera);
         }
+
         const progressPath = pathSlice(scene.enemyProgress);
         for (let i = 0; i < progressPath.length - 1; i += 1) {
-          drawSegment(progressPath[i], progressPath[i + 1], 14, [1, 0.95, 0.78, 0.95]);
+          drawTriangles(segmentPrism(progressPath[i], progressPath[i + 1], 0.12, 0.08), [0.98, 0.9, 0.7, 0.95], camera);
         }
 
-        drawCircle({ x: 84, y: 77 }, 18, [0.43, 0.38, 0.89, 1]);
-        drawCircle(scene.enemyPosition, 16, [0.75, 0.18, 0.2, 1]);
+        const gate = pctToWorld({ x: 84, y: 77 });
+        drawTriangles(boxVertices([gate.x, -0.05, gate.z], [0.24, 0.22, 0.24]), [0.32, 0.27, 0.66, 1], camera);
+        drawTriangles(sphereVertices([gate.x, 0.12, gate.z], 0.08, 9, 7), [0.55, 0.71, 1, 0.95], camera);
+
+        const enemy = pctToWorld(scene.enemyPosition);
+        drawTriangles(sphereVertices([enemy.x, -0.03, enemy.z], 0.09, 12, 9), [0.78, 0.22, 0.2, 1], camera);
+
         if (scene.freezeSec > 0) {
-          drawCircle(scene.enemyPosition, 24, [0.55, 0.8, 1, 0.3]);
+          drawTriangles(sphereVertices([enemy.x, -0.03, enemy.z], 0.15, 10, 8), [0.55, 0.82, 1, 0.3], camera);
         }
 
         for (const shot of scene.shots) {
-          drawCircle(shot.pos, 4, [0.6, 0.9, 1, Math.max(0.15, 1 - shot.progress)]);
+          const p = pctToWorld(shot.pos);
+          const travelLift = 0.05 + ((1 - shot.progress) * 0.12);
+          drawTriangles(sphereVertices([p.x, travelLift, p.z], 0.025, 8, 6), [0.6, 0.9, 1, Math.max(0.25, 1 - shot.progress)], camera);
         }
       }
 
       return { render, available: true };
     }
+
 
     const tdRenderer = createTowerDefenseWebGLRenderer(els.tdWebglCanvas);
 
