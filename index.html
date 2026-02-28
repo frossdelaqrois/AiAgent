@@ -572,38 +572,53 @@
 
     .td-battlefield {
       position: relative;
-      height: 86px;
+      height: 160px;
       border-radius: 10px;
       margin: 10px 0 8px;
       border: 1px solid rgba(115, 196, 255, 0.32);
-      background: linear-gradient(180deg, rgba(9, 18, 32, 0.95), rgba(10, 9, 16, 0.95));
+      background:
+        radial-gradient(circle at 18% 22%, rgba(69, 125, 78, 0.36), transparent 35%),
+        radial-gradient(circle at 80% 70%, rgba(57, 98, 66, 0.3), transparent 40%),
+        linear-gradient(180deg, rgba(17, 37, 31, 0.95), rgba(10, 20, 23, 0.95));
       overflow: hidden;
     }
 
-    .td-wave-fill {
+    .td-path {
       position: absolute;
-      inset: 0;
-      width: 0;
-      background: linear-gradient(90deg, rgba(54, 165, 245, 0.42), rgba(159, 67, 255, 0.35));
-      transition: width 0.12s linear;
+      inset: 8px;
+      border-radius: 8px;
+      background:
+        linear-gradient(90deg, transparent 0%, transparent 9%, rgba(182, 154, 102, 0.72) 9%, rgba(182, 154, 102, 0.72) 48%, transparent 48%, transparent 100%),
+        linear-gradient(180deg, transparent 0%, transparent 25%, rgba(182, 154, 102, 0.72) 25%, rgba(182, 154, 102, 0.72) 62%, transparent 62%, transparent 100%),
+        linear-gradient(90deg, transparent 0%, transparent 45%, rgba(182, 154, 102, 0.72) 45%, rgba(182, 154, 102, 0.72) 91%, transparent 91%, transparent 100%),
+        linear-gradient(180deg, transparent 0%, transparent 55%, rgba(182, 154, 102, 0.72) 55%, rgba(182, 154, 102, 0.72) 88%, transparent 88%, transparent 100%);
+      opacity: 0.9;
     }
 
-    .td-wave-fill.low-power {
-      background: linear-gradient(90deg, rgba(255, 105, 77, 0.48), rgba(255, 186, 92, 0.35));
+    .td-path.low-power {
+      filter: hue-rotate(-25deg) saturate(1.2);
     }
 
     .td-tower-icon,
     .td-enemy-icon {
       position: absolute;
-      top: 50%;
-      transform: translateY(-50%);
+      transform: translate(-50%, -50%);
       font-size: 1.8rem;
       filter: drop-shadow(0 0 7px rgba(0, 0, 0, 0.55));
       z-index: 2;
     }
 
-    .td-tower-icon { right: 8px; }
-    .td-enemy-icon { left: 8px; transition: left 0.12s linear; }
+    .td-tower-icon {
+      right: 11%;
+      top: 77%;
+      transform: translate(50%, -50%);
+    }
+
+    .td-enemy-icon {
+      left: 12%;
+      top: 14%;
+      transition: left 0.12s linear, top 0.12s linear;
+    }
 
     .td-power-warning {
       font-size: 0.75rem;
@@ -801,11 +816,11 @@
         <div class="td-lane">
           <div class="tiny">Wave <b id="tdWave">1</b> • Breaches <b id="tdBreaches">0</b> / 5</div>
           <div class="td-battlefield">
-            <span id="tdWaveFill" class="td-wave-fill"></span>
+            <span id="tdPath" class="td-path"></span>
             <span id="tdEnemyIcon" class="td-enemy-icon">🌊</span>
             <span class="td-tower-icon">🏰</span>
           </div>
-          <div class="td-track"><span id="tdProgress" class="td-progress"></span></div>
+          <div class="tiny" id="tdDistance">Distance to gate: 100%</div>
           <div class="tiny">Enemy HP</div>
           <div class="td-track"><span id="tdEnemyHp" class="td-progress"></span></div>
           <div id="tdPowerWarning" class="td-power-warning"></div>
@@ -1368,13 +1383,13 @@
       quickslots: document.getElementById("quickslots"),
       tdWave: document.getElementById("tdWave"),
       tdBreaches: document.getElementById("tdBreaches"),
-      tdProgress: document.getElementById("tdProgress"),
       tdEnemyHp: document.getElementById("tdEnemyHp"),
+      tdDistance: document.getElementById("tdDistance"),
       tdEnemyInfo: document.getElementById("tdEnemyInfo"),
       tdDps: document.getElementById("tdDps"),
       tdSpellBonus: document.getElementById("tdSpellBonus"),
       tdReward: document.getElementById("tdReward"),
-      tdWaveFill: document.getElementById("tdWaveFill"),
+      tdPath: document.getElementById("tdPath"),
       tdEnemyIcon: document.getElementById("tdEnemyIcon"),
       tdPowerWarning: document.getElementById("tdPowerWarning"),
       spellSlotModal: document.getElementById("spellSlotModal"),
@@ -2448,6 +2463,27 @@
         .join("");
     }
 
+    function tdPathPosition(progressRatio) {
+      const points = [
+        { x: 11, y: 14 },
+        { x: 45, y: 14 },
+        { x: 45, y: 50 },
+        { x: 84, y: 50 },
+        { x: 84, y: 77 }
+      ];
+      const clamped = Math.max(0, Math.min(1, progressRatio));
+      const segmentCount = points.length - 1;
+      const segmentFloat = clamped * segmentCount;
+      const segmentIndex = Math.min(segmentCount - 1, Math.floor(segmentFloat));
+      const t = segmentFloat - segmentIndex;
+      const from = points[segmentIndex];
+      const to = points[segmentIndex + 1];
+      return {
+        x: from.x + ((to.x - from.x) * t),
+        y: from.y + ((to.y - from.y) * t)
+      };
+    }
+
     function renderTowerDefense() {
       const td = state.towerDefense;
       const hpPct = Math.max(0, Math.min(100, (td.enemyHp / Math.max(1, td.enemyMaxHp)) * 100));
@@ -2457,13 +2493,14 @@
       const requiredPower = tdRequiredPower(td.wave);
       const powerRatio = tdPowerRatio();
       const towerPowerLow = powerRatio < 1;
+      const enemyPos = tdPathPosition(td.enemyProgress);
       els.tdWave.textContent = String(td.wave);
       els.tdBreaches.textContent = String(td.breaches);
-      els.tdProgress.style.width = `${progressPct.toFixed(2)}%`;
       els.tdEnemyHp.style.width = `${hpPct.toFixed(2)}%`;
-      els.tdWaveFill.style.width = `${progressPct.toFixed(2)}%`;
-      els.tdEnemyIcon.style.left = `calc(${progressPct.toFixed(2)}% - 12px)`;
-      els.tdWaveFill.classList.toggle("low-power", towerPowerLow);
+      els.tdDistance.textContent = `Distance to gate: ${(100 - progressPct).toFixed(0)}%`;
+      els.tdEnemyIcon.style.left = `${enemyPos.x.toFixed(2)}%`;
+      els.tdEnemyIcon.style.top = `${enemyPos.y.toFixed(2)}%`;
+      els.tdPath.classList.toggle("low-power", towerPowerLow);
       if (towerPowerLow) {
         const pct = Math.max(0, Math.min(100, powerRatio * 100));
         els.tdPowerWarning.textContent = `Tower power low (${pct.toFixed(0)}% of needed). Breach chance increased.`;
