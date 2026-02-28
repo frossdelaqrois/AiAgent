@@ -735,18 +735,18 @@
     </section>
 
     <section class="panel wide">
-      <h2>📖 Spell Charging & Casting Guide</h2>
+      <h2>📖 Spell Casting Guide</h2>
       <ul class="guide-list">
-        <li><strong>Shard income:</strong> Spells charge from passive shard generation, orb click-pool collections, 20% shard procs from autoclicks, and dedicated shard spells such as <em>Spell Focus</em>.</li>
-        <li><strong>Shard targeting:</strong> New shards are assigned to random non-full spells. Overflow is redirected, and shard-generating spells split gains across other equipped non-full spells.</li>
-        <li><strong>Build strategy:</strong> Keep your primary payout spell alongside shard generators and multiple summon/autoclick spells to sustain cast loops.</li>
-        <li><strong>Autocast modes:</strong> <strong>Careful</strong> (Alt) waits for full charges, while <strong>Reckless</strong> (Shift) spends charges immediately as they appear.</li>
-        <li><strong>Cast order matters:</strong> Autocasts resolve left-to-right each frame, so place shard generators and combo refresh tools in rightmost slots for best refill timing.</li>
-        <li><strong>Type roles:</strong> Evocations are burst casts, Incantations are temporary multipliers, and Summons provide duration-based autoclick engines.</li>
-        <li><strong>Special spell families:</strong> Accumulated and Persistent spells scale with repeated casts, while select Augments keep passive effects even when inactive.</li>
-        <li><strong>Non-shard spells:</strong> Some abilities charge over time or class-specific resources (e.g., meditation or liquid shadow) instead of shard costs.</li>
+        <li><strong>Careful (Blue):</strong> A spell autocasts only when it gains its final charge. Use <strong>Alt + click</strong> (or <strong>Alt + number</strong>) to queue precise combos while other spells continue charging.</li>
+        <li><strong>Reckless (Red):</strong> A spell autocasts as soon as it gains any charge. Use <strong>Shift + click</strong> (or <strong>Shift + number</strong>) for high-frequency casting.</li>
+        <li><strong>Cast-rate limits:</strong> Instant spells can cast once every 2 frames and duration spells once every 3 frames. At 120 FPS, this caps at 60 instant casts/sec or 40 duration casts/sec.</li>
+        <li><strong>Autocast order:</strong> If multiple spells are ready in the same frame, they resolve <strong>left to right</strong> on the bar, so slot order directly affects combo outcomes.</li>
+        <li><strong>Spell roles:</strong> <strong>Evocation</strong> spells are burst payouts, <strong>Incantation</strong> spells are temporary amplifiers, and <strong>Summoning</strong> spells sustain autoclick-based engines.</li>
+        <li><strong>Duration families:</strong> Spells can be Instant, Periodic, Continuous, or Augment, and each timing model changes recast behavior.</li>
+        <li><strong>Scaling families:</strong> Accumulated spells grow with cast count, while Persistent spells include an exile-reset active effect plus a realm-reset passive effect.</li>
+        <li><strong>Priority edge cases:</strong> Some spells are low-priority and only gain charges after other panel spells are full.</li>
       </ul>
-      <div class="guide-note">Tip: If your combo stalls, reduce expensive low-priority spells, increase autoclick uptime, and use low-cost shard generators first to keep the bar cycling.</div>
+      <div class="guide-note">Tip: Keep shard-generation and refresh spells near the right side of the bar so earlier left-side casts can be refilled inside the same autocast cycle.</div>
     </section>
 
     <section class="panel wide">
