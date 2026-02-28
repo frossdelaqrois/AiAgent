@@ -639,10 +639,41 @@
       transform: translate(50%, -50%);
     }
 
-    .td-enemy-icon {
+    .td-enemy-unit {
+      position: absolute;
       left: 14%;
       top: 16%;
+      width: 56px;
+      display: grid;
+      justify-items: center;
+      gap: 4px;
+      transform: translate(-50%, -100%);
       transition: left 0.12s linear, top 0.12s linear;
+      z-index: 3;
+      pointer-events: none;
+    }
+
+    .td-enemy-icon {
+      position: static;
+      transform: none;
+    }
+
+    .td-enemy-health {
+      width: 100%;
+      height: 7px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 196, 97, 0.55);
+      background: rgba(0, 0, 0, 0.55);
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    }
+
+    .td-enemy-health span {
+      display: block;
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #ff5959, #ff9f4d);
+      transition: width 0.12s linear;
     }
 
     .td-decor {
@@ -849,7 +880,7 @@
 
     <section class="panel wide">
       <h2>🏹 Arcane Tower Defense</h2>
-      <div class="meta">Your idle wizard total power scales your tower damage. Casting spells empowers the lane with burst damage and shorter enemy freezes.</div>
+      <div class="meta">Your idle wizard total power scales your tower damage. Casting spells empower the lane with burst damage and shorter enemy freezes. If a demon breaches the gate, one random structure upgrade is damaged.</div>
       <div class="td-grid">
         <div class="td-lane">
           <div class="tiny">Wave <b id="tdWave">1</b> • Breaches <b id="tdBreaches">0</b> / 5</div>
@@ -859,12 +890,13 @@
             <span class="td-decor t2">🗼</span>
             <span class="td-decor t3">🔥</span>
             <span class="td-decor t4">🧙</span>
-            <span id="tdEnemyIcon" class="td-enemy-icon">👹</span>
+            <span id="tdEnemyUnit" class="td-enemy-unit">
+              <span class="td-enemy-health"><span id="tdEnemyHp"></span></span>
+              <span id="tdEnemyIcon" class="td-enemy-icon">👹</span>
+            </span>
             <span class="td-tower-icon">🏯</span>
           </div>
           <div class="tiny" id="tdDistance">Distance to gate: 100%</div>
-          <div class="tiny">Enemy HP</div>
-          <div class="td-track"><span id="tdEnemyHp" class="td-progress"></span></div>
           <div id="tdPowerWarning" class="td-power-warning"></div>
           <div id="tdEnemyInfo" class="td-enemy">A scouting wisp approaches...</div>
         </div>
@@ -1432,6 +1464,7 @@
       tdSpellBonus: document.getElementById("tdSpellBonus"),
       tdReward: document.getElementById("tdReward"),
       tdPath: document.getElementById("tdPath"),
+      tdEnemyUnit: document.getElementById("tdEnemyUnit"),
       tdEnemyIcon: document.getElementById("tdEnemyIcon"),
       tdPowerWarning: document.getElementById("tdPowerWarning"),
       spellSlotModal: document.getElementById("spellSlotModal"),
@@ -1774,6 +1807,40 @@
       state.towerDefense.enemyProgress = 0;
     }
 
+    function structureUpgradePool() {
+      return Object.entries(state.upgrades)
+        .filter(([key, level]) => {
+          if (!level) return false;
+          const up = upgradeData[key];
+          if (!up) return false;
+          if (up.structureTarget) return true;
+          return (up.effect || "").toLowerCase().includes("structure");
+        })
+        .map(([key]) => key);
+    }
+
+    function removeRandomStructureUpgrade() {
+      const pool = structureUpgradePool();
+      if (!pool.length) {
+        addLog("A demon breached the gate, but no structure upgrade was available to shatter.", "warn");
+        return;
+      }
+      const key = pool[Math.floor(Math.random() * pool.length)];
+      const up = upgradeData[key];
+      const previous = upgradeLevel(key);
+      if (up.repeatable) {
+        state.upgrades[key] = Math.max(0, previous - 1);
+      } else {
+        state.upgrades[key] = 0;
+      }
+      const after = upgradeLevel(key);
+      if (up.repeatable) {
+        addLog(`Breach penalty: ${up.name} was damaged (${previous} → ${after}).`, "warn");
+      } else {
+        addLog(`Breach penalty: ${up.name} was destroyed.`, "warn");
+      }
+    }
+
     function updateTowerDefense(delta) {
       if (state.towerDefense.breaches >= tdMaxBreaches) return;
       if (state.towerDefense.spellFreezeSec > 0) {
@@ -1797,6 +1864,7 @@
       } else if (state.towerDefense.enemyProgress >= 1) {
         state.towerDefense.breaches += 1;
         state.towerDefense.spellPressure = Math.max(0, state.towerDefense.spellPressure - 0.6);
+        removeRandomStructureUpgrade();
         spawnTdEnemy(state.towerDefense.wave);
       }
     }
@@ -2559,8 +2627,8 @@
       els.tdBreaches.textContent = String(td.breaches);
       els.tdEnemyHp.style.width = `${hpPct.toFixed(2)}%`;
       els.tdDistance.textContent = `Distance to gate: ${(100 - progressPct).toFixed(0)}%`;
-      els.tdEnemyIcon.style.left = `${enemyPos.x.toFixed(2)}%`;
-      els.tdEnemyIcon.style.top = `${enemyPos.y.toFixed(2)}%`;
+      els.tdEnemyUnit.style.left = `${enemyPos.x.toFixed(2)}%`;
+      els.tdEnemyUnit.style.top = `${enemyPos.y.toFixed(2)}%`;
       els.tdPath.classList.toggle("low-power", towerPowerLow);
       if (towerPowerLow) {
         const pct = Math.max(0, Math.min(100, powerRatio * 100));
