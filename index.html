@@ -29,6 +29,2301 @@
     <p id="status" class="status">Loading WebAssembly module...</p>
   </main>
 
-  <script type="module" src="js/main.js"></script>
-</body>
+  <div id="upgradeListModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="upgradeListTitle">
+    <div class="upgrade-modal panel">
+      <div class="upgrade-modal-header">
+        <h3 id="upgradeListTitle">All Upgrades & Unlock Conditions</h3>
+        <button id="closeUpgradeListBtn" class="btn-ghost" type="button">Close</button>
+      </div>
+      <div id="upgradeListBody" class="upgrade-modal-list"></div>
+    </div>
+  </div>
+
+  <div id="gearModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gearModalTitle">
+    <div class="upgrade-modal panel">
+      <div class="upgrade-modal-header">
+        <h3 id="gearModalTitle">Slot Gear</h3>
+        <button id="closeGearModalBtn" class="btn-ghost" type="button">Close</button>
+      </div>
+      <div id="gearModalBody" class="upgrade-modal-list"></div>
+    </div>
+  </div>
+
+  <div id="spellSlotModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="spellSlotModalTitle">
+    <div class="upgrade-modal panel">
+      <div class="upgrade-modal-header">
+        <h3 id="spellSlotModalTitle">Assign Spell</h3>
+        <button id="closeSpellSlotModalBtn" class="btn-ghost" type="button">Close</button>
+      </div>
+      <div id="spellSlotModalBody" class="upgrade-modal-list"></div>
+    </div>
+  </div>
+
+  <div id="achievementPopups" class="achievement-popups" aria-live="polite"></div>
+
+  <script>window.__RUST_TD_ACTIVE = true;</script>
+  <script type="module" src="js/towerDefenseRust.js"></script>
+
+  <script>
+    const STORAGE_KEY = "arcane-idle-save-v2";
+    const AUTO_SAVE_MS = 20000;
+
+
+    function webIcon(glyph) {
+      const codepoint = Array.from(glyph)
+        .map((char) => char.codePointAt(0).toString(16))
+        .filter((code) => code !== "fe0f")
+        .join("-");
+      return `https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/${codepoint}.png`;
+    }
+
+    const structureData = {
+      apprentice: { name: "Apprentice", baseCost: 15, mps: 0.6, growth: 1.15, image: webIcon("🧙"), tooltip: "Apprentices channel basic mana streams and are your first source of passive mana income." },
+      crystal: { name: "Mana Crystal", baseCost: 100, mps: 4, growth: 1.16, image: webIcon("🔷"), tooltip: "Mana Crystals store ambient arcane power to sharply increase mana per second." },
+      library: { name: "Enchanted Library", baseCost: 550, mps: 22, growth: 1.18, image: webIcon("📚"), tooltip: "Enchanted Libraries unlock efficient spellcraft methods that multiply your idle gains." },
+      golem: { name: "Arcane Golem", baseCost: 2600, mps: 95, growth: 1.2, image: webIcon("🗿"), tooltip: "Arcane Golems automate heavy magical labor and massively boost production." },
+      observatory: { name: "Astral Observatory", baseCost: 11000, mps: 440, growth: 1.23, image: webIcon("🔭"), tooltip: "Astral Observatories align your tower with leylines for elite mana generation." },
+      manaForge: { name: "Mana Forge", baseCost: 42000, mps: 1650, growth: 1.24, image: webIcon("🔥"), tooltip: "A blazing forge that condenses raw arcana into high-output power cores." },
+      portalNexus: { name: "Portal Nexus", baseCost: 140000, mps: 5200, growth: 1.26, image: webIcon("🌀"), tooltip: "Portal arrays siphon mana from nearby dimensions." },
+      skyCitadel: { name: "Sky Citadel", baseCost: 420000, mps: 18000, growth: 1.27, image: webIcon("🏰"), tooltip: "Floating mage-citadels create massive autonomous arcane output." },
+      voidReactor: { name: "Void Reactor", baseCost: 1300000, mps: 63000, growth: 1.29, image: webIcon("🌌"), tooltip: "Harnesses dark-space turbulence for late-game production spikes." },
+    };
+
+    const upgradeData = {
+      focusedWand: {
+        name: "Focused Wand",
+        cost: 60,
+        effect: "Double Arcane Bolt power",
+        school: "Arcane",
+        image: webIcon("🪄"),
+        tooltip: "Focused Wand strengthens each manual cast, making every click worth twice as much mana.",
+        apply: (state) => state.clickPower *= 2,
+      },
+      dualChanneling: {
+        name: "Dual Channeling",
+        cost: 450,
+        effect: "Arcane Bolt gains +8 power",
+        school: "Arcane",
+        image: webIcon("✨"),
+        tooltip: "Dual Channeling weaves two spells at once so each cast adds a large flat mana bonus.",
+        apply: (state) => state.clickPower += 8,
+      },
+      runeEtching: {
+        name: "Rune Etching",
+        cost: 1200,
+        effect: "All spell power +30%",
+        school: "Arcane",
+        image: webIcon("🔯"),
+        tooltip: "Arcane runes amplify the impact of every offensive cast.",
+        apply: () => {},
+      },
+      manaCompression: {
+        name: "Mana Compression",
+        cost: 4200,
+        effect: "Spell costs -20%",
+        school: "Arcane",
+        image: webIcon("🧿"),
+        tooltip: "Dense mana channels reduce the mana needed to cast heavy spells.",
+        apply: () => {},
+      },
+      leylineBinding: {
+        name: "Leyline Binding",
+        cost: 1400,
+        effect: "All structures produce +25% mana",
+        school: "Nature",
+        image: webIcon("🧬"),
+        tooltip: "Leyline Binding anchors your tower to nearby leylines, increasing all structure output.",
+        apply: () => {},
+      },
+      crystallizedThought: {
+        name: "Crystallized Thought",
+        cost: 6000,
+        effect: "All structures produce +50% mana",
+        school: "Mind",
+        image: webIcon("💎"),
+        tooltip: "Crystallized Thought refines magical focus, delivering a major global boost to structures.",
+        apply: () => {},
+      },
+      archmageSigil: {
+        name: "Archmage Sigil",
+        cost: 26000,
+        effect: "All structures produce +120% mana",
+        school: "Arcane",
+        image: webIcon("🔱"),
+        tooltip: "An ancient sigil that supercharges every mana engine in your empire.",
+        apply: () => {},
+      },
+      tempestMastery: {
+        name: "Tempest Mastery",
+        cost: 90000,
+        effect: "Lightning and Meteor spells +90% power",
+        school: "Elemental",
+        image: webIcon("⚡"),
+        tooltip: "Mastery over storm magic dramatically boosts high-tier burst spells.",
+        apply: () => {},
+      },
+      planarRefinery: {
+        name: "Planar Refinery",
+        cost: 350000,
+        effect: "All structures produce +180% mana",
+        school: "Void",
+        image: webIcon("🏭"),
+        tooltip: "Distills planar residue into endless fuel for your late-game production chain.",
+        apply: () => {},
+      },
+      celestialLattice: {
+        name: "Celestial Lattice",
+        cost: 1200000,
+        effect: "All spell power +120%",
+        school: "Celestial",
+        image: webIcon("🌠"),
+        tooltip: "Interlocks starlight and sigils so every spell detonates with vastly greater force.",
+        apply: () => {},
+      },
+      singularityCore: {
+        name: "Singularity Core",
+        cost: 4500000,
+        effect: "All structures produce +300% mana and spell costs -25%",
+        school: "Void",
+        image: webIcon("🕳️"),
+        tooltip: "A compressed void-kernel that warps production and dramatically improves spell efficiency.",
+        apply: () => {},
+      },
+      apprenticeTheory: {
+        name: "Apprentice Theory",
+        cost: 900,
+        effect: "Unlocks scaling Arcane Study research",
+        school: "Arcane",
+        image: webIcon("📜"),
+        tooltip: "Inspired by Idle Wizard's layered upgrade trees: this opens repeatable spell research.",
+        requirementText: "Reach 1,500 total power",
+        requirement: (s) => s.totalPower >= 1500,
+        apply: () => {},
+      },
+      arcaneStudy: {
+        name: "Arcane Study",
+        cost: 1500,
+        effect: "+8% spell power per level",
+        school: "Arcane",
+        repeatable: true,
+        growth: 1.7,
+        image: webIcon("📘"),
+        tooltip: "A repeatable tome upgrade inspired by Idle Wizard's scaling upgrade purchases.",
+        requirementText: "Learn Apprentice Theory",
+        requirement: (s) => s.upgrades.apprenticeTheory,
+        apply: () => {},
+      },
+      manaInfusion: {
+        name: "Mana Infusion",
+        cost: 4000,
+        effect: "+6% structure output per level",
+        school: "Elemental",
+        repeatable: true,
+        growth: 1.8,
+        image: webIcon("💠"),
+        tooltip: "A scaling infusion line similar to long-form Idle Wizard enhancement chains.",
+        requirementText: "Own 12 total structures",
+        requirement: (s) => Object.values(s.structures).reduce((sum, amount) => sum + amount, 0) >= 12,
+        apply: () => {},
+      },
+      ritualEconomy: {
+        name: "Ritual Economy",
+        cost: 9000,
+        effect: "Spell costs -3% per level (cap 45%)",
+        school: "Void",
+        repeatable: true,
+        growth: 2,
+        image: webIcon("🕯️"),
+        tooltip: "Late-game spell efficiency research modeled after compounding upgrade systems.",
+        requirementText: "Cast 80 spells",
+        requirement: (s) => s.spellCasts >= 80,
+        apply: () => {},
+      },
+    };
+
+    const structureOrder = Object.keys(structureData);
+    const structureUpgradeTiers = 5;
+    for (const [index, structureKey] of structureOrder.entries()) {
+      const structure = structureData[structureKey];
+      const structureSlug = structure.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      for (let tier = 1; tier <= structureUpgradeTiers; tier += 1) {
+        const id = `${structureSlug}-amplifier-${tier}`;
+        const unlockCount = (tier * 4) + (index * 2);
+        const logarithmicScale = 1 + Math.log10(structure.baseCost * (tier + 2));
+        const tierScale = Math.pow(tier + 1, 1.55);
+        const cost = Math.floor(structure.baseCost * 18 * logarithmicScale * tierScale);
+        const bonus = Number((0.12 + (Math.log2(tier + 1) * 0.11)).toFixed(3));
+
+        upgradeData[id] = {
+          name: `${structure.name} Amplifier ${tier}`,
+          cost,
+          effect: `${structure.name} output +${Math.round(bonus * 100)}%`,
+          school: "Structure",
+          image: structure.image,
+          tooltip: `Logarithmic scaling enhancement focused on ${structure.name}. Boosts only this structure for targeted growth.`,
+          requirementText: `Own ${unlockCount} ${structure.name}${unlockCount === 1 ? "" : "s"}`,
+          requirement: (s) => s.structures[structureKey] >= unlockCount,
+          structureTarget: structureKey,
+          structureBonus: bonus,
+          apply: () => {},
+        };
+      }
+    }
+
+    const spellGlyphs = ["✨", "🔥", "⚡", "🌠", "🌀", "❄️", "🌪️", "☄️", "🌙", "💥", "💫", "🪄", "🌌", "🔮", "🧿", "🌋", "🪽", "🕯️", "🪐", "🌈", "🧬", "💎", "⭐", "☀️", "🌊", "🌱", "⏳", "🛸", "🪞", "⚔️", "🧲", "🧠", "🎇", "🌀", "🌫️", "🗝️", "🧊", "🧨", "🦉", "🦴", "🪬", "🧵", "🕳️", "🗿", "🛰️", "🕸️", "🥀", "🌍", "🌋", "☯️"];
+
+    const spellData = Object.fromEntries(Array.from({ length: 50 }, (_, idx) => {
+      const id = `spell${idx + 1}`;
+      const tier = idx + 1;
+      return [id, {
+        id,
+        name: `Arcane Spell ${tier}`,
+        basePower: Math.floor(14 * Math.pow(1.31, tier - 1)),
+        manaCost: Math.max(6, Math.floor(7 * Math.pow(1.26, tier - 1))),
+        durationSec: Math.max(6, 14 - Math.floor((tier - 1) / 6)),
+        unlockLevel: tier === 1 ? 0 : tier + 1,
+        image: webIcon(spellGlyphs[idx] || "✨"),
+      }];
+    }));
+
+    const spellQuickslotCount = 5;
+    const tdMaxBreaches = 5;
+
+    const petData = {
+      emberFox: {
+        name: "Ember Fox",
+        tier: 1,
+        image: webIcon("🦊"),
+        bonusText: "Global production",
+        xpScale: 1,
+        bonus: (level) => 0.08 + ((level - 1) * 0.045),
+        apply: (mods, value) => { mods.production *= 1 + value; },
+      },
+      astralOwl: {
+        name: "Astral Owl",
+        tier: 1,
+        image: webIcon("🦉"),
+        bonusText: "Spell power",
+        xpScale: 1,
+        bonus: (level) => 0.1 + ((level - 1) * 0.06),
+        apply: (mods, value) => { mods.spell *= 1 + value; },
+      },
+      manaSlime: {
+        name: "Mana Slime",
+        tier: 1,
+        image: webIcon("🫧"),
+        bonusText: "Mana from production",
+        xpScale: 1.05,
+        bonus: (level) => 0.12 + ((level - 1) * 0.05),
+        apply: (mods, value) => { mods.manaGain *= 1 + value; },
+      },
+      clockworkImp: {
+        name: "Clockwork Imp",
+        tier: 1,
+        image: webIcon("😈"),
+        bonusText: "Cast XP gain",
+        xpScale: 1.12,
+        bonus: (level) => 0.08 + ((level - 1) * 0.04),
+        apply: (mods, value) => { mods.petXp *= 1 + value; },
+      },
+      voidTurtle: {
+        name: "Void Turtle",
+        tier: 1,
+        image: webIcon("🐢"),
+        bonusText: "Offline mana",
+        xpScale: 1.25,
+        bonus: (level) => 0.2 + ((level - 1) * 0.07),
+        apply: (mods, value) => { mods.offlineMana *= 1 + value; },
+      },
+      infernoFox: {
+        name: "Inferno Fox",
+        tier: 2,
+        unlockFrom: "emberFox",
+        image: webIcon("🔥"),
+        bonusText: "Global production",
+        xpScale: 1.38,
+        bonus: (level) => 0.5 + ((level - 1) * 0.11),
+        apply: (mods, value) => { mods.production *= 1 + value; },
+      },
+      eclipseOwl: {
+        name: "Eclipse Owl",
+        tier: 2,
+        unlockFrom: "astralOwl",
+        image: webIcon("🌒"),
+        bonusText: "Spell power",
+        xpScale: 1.38,
+        bonus: (level) => 0.55 + ((level - 1) * 0.12),
+        apply: (mods, value) => { mods.spell *= 1 + value; },
+      },
+      prismaticSlime: {
+        name: "Prismatic Slime",
+        tier: 2,
+        unlockFrom: "manaSlime",
+        image: webIcon("🌈"),
+        bonusText: "Mana from production",
+        xpScale: 1.45,
+        bonus: (level) => 0.6 + ((level - 1) * 0.1),
+        apply: (mods, value) => { mods.manaGain *= 1 + value; },
+      },
+      chronoImp: {
+        name: "Chrono Imp",
+        tier: 2,
+        unlockFrom: "clockworkImp",
+        image: webIcon("⏱️"),
+        bonusText: "Cast XP gain",
+        xpScale: 1.52,
+        bonus: (level) => 0.45 + ((level - 1) * 0.09),
+        apply: (mods, value) => { mods.petXp *= 1 + value; },
+      },
+      titanTurtle: {
+        name: "Titan Turtle",
+        tier: 2,
+        unlockFrom: "voidTurtle",
+        image: webIcon("🪨"),
+        bonusText: "Offline mana",
+        xpScale: 1.6,
+        bonus: (level) => 0.7 + ((level - 1) * 0.13),
+        apply: (mods, value) => { mods.offlineMana *= 1 + value; },
+      },
+    };
+
+    function isPetUnlocked(petKey) {
+      const pet = petData[petKey];
+      if (!pet) return false;
+      if (!pet.unlockFrom) return true;
+      return petState(pet.unlockFrom).level >= 99;
+    }
+
+    const achievementData = [
+      { key: "mana1k", name: "Power Hoarder I", image: webIcon("🥉"), test: (s) => s.totalPower >= 1000, requirement: "Accumulate 1,000 total power from any source.", reward: "+5% structure output", tooltip: "First hoarding milestone. Keep casting and buying structures until lifetime power hits 1,000." },
+      { key: "mana20k", name: "Power Hoarder II", image: webIcon("🥈"), test: (s) => s.totalPower >= 20000, requirement: "Accumulate 20,000 total power over the run.", reward: "+10% structure output", tooltip: "Advanced hoarding milestone. Scale production and idle income to reach 20,000 lifetime power." },
+      { key: "mana250k", name: "Power Hoarder III", image: webIcon("🥇"), test: (s) => s.totalPower >= 250000, requirement: "Accumulate 250,000 total power.", reward: "+15% structure output", tooltip: "A mid-game mastery checkpoint that rewards sustained scaling." },
+      { key: "mana2m", name: "Power Sovereign", image: webIcon("👑"), test: (s) => s.totalPower >= 2000000, requirement: "Accumulate 2,000,000 total power.", reward: "+25% structure output", tooltip: "A late milestone for long sessions, requiring a truly automated tower." },
+      { key: "golem3", name: "Golem Battalion", image: webIcon("🏅"), test: (s) => s.structures.golem >= 3, requirement: "Own 3 Arcane Golems at the same time.", reward: "+15 click power", tooltip: "Construct three Arcane Golems to earn this badge and permanently strengthen manual casting." },
+      { key: "towerTycoon", name: "Tower Tycoon", image: webIcon("🏛️"), test: (s) => Object.values(s.structures).reduce((sum, amount) => sum + amount, 0) >= 80, requirement: "Own 80 total structures.", reward: "+20% structure output", tooltip: "Rewards broad investment across your whole structure roster." },
+      { key: "skyLord", name: "Lord of the Sky", image: webIcon("🏰"), test: (s) => s.structures.skyCitadel >= 5, requirement: "Own 5 Sky Citadels.", reward: "+15% spell power", tooltip: "Your floating strongholds improve spell efficiency across all casts." },
+      { key: "spellweaver", name: "Spellweaver", image: webIcon("📘"), test: (s) => s.spellCasts >= 250, requirement: "Cast 250 spells in total.", reward: "-10% spell costs", tooltip: "Dedicated casting lowers spell maintenance costs permanently." },
+      { key: "voidCaller", name: "Void Caller", image: webIcon("🌌"), test: (s) => s.structures.voidReactor >= 2, requirement: "Own 2 Void Reactors.", reward: "+40 click power", tooltip: "A deep-end milestone that empowers manual burst play in the late game." },
+    ];
+
+    const gearSlotData = {
+      weapon: { name: "Weapon", icon: "⚔️" },
+      helm: { name: "Helm", icon: "🪖" },
+      chest: { name: "Chest", icon: "🛡️" },
+      gloves: { name: "Gloves", icon: "🧤" },
+      ring: { name: "Ring", icon: "💍" },
+      trinket: { name: "Trinket", icon: "🧿" },
+    };
+
+    function createGearSet(slotPrefix, names, icons, baseCost, baseBonus) {
+      const costGrowth = 3.2;
+      const bonusStep = 0.0125;
+      return names.map((name, idx) => ({
+        id: `${slotPrefix}-${idx + 1}`,
+        name,
+        icon: webIcon(icons[idx]),
+        tier: idx + 1,
+        cost: Math.round(baseCost * Math.pow(costGrowth, idx)),
+        profitBonus: Number((baseBonus + idx * bonusStep).toFixed(3)),
+      }));
+    }
+
+    const gearData = {
+      weapon: createGearSet(
+        "weapon",
+        ["Oak Initiate Wand", "Emberglass Rod", "Stormcaller Staff", "Rift Channeler Blade", "Astral Pike of Profit", "Sunfire Scepter", "Runeforged Spear", "Tempest Halberd", "Comet Cleaver", "Nebula Scythe", "Aether Lance", "Duskfang Saber", "Moonshard Staff", "Prism Greatblade", "Starbreaker Pike", "Chrono Rapier", "Eclipse Polearm", "Voidbrand Edge", "Aurora Chakram", "Titan Arcblade", "Celestial Reaver", "Paradox Trident", "Infinity Glaive", "Mythic Arcanum Blade", "Worldspark Relicblade"],
+        ["🪄", "🔥", "⚡", "🗡️", "🛡️", "☀️", "🔱", "🌩️", "☄️", "🌌", "💠", "🌙", "✨", "🔮", "⭐", "⏳", "🌘", "🕳️", "🌈", "🪓", "🛰️", "🔺", "♾️", "🧬", "🚀"],
+        220,
+        0.03
+      ),
+      helm: createGearSet(
+        "helm",
+        ["Linen Cowl", "Seer's Hood", "Wyrmfire Circlet", "Runic Crown", "Crown of the Archmage", "Sunveil Helm", "Tempest Visor", "Sage Diadem", "Titan Browguard", "Dawncrest Crown", "Moonlit Mask", "Aether Coronet", "Stormwake Helm", "Prismatic Tiara", "Starwrought Helm", "Chronomancer Hood", "Frosthalo Circlet", "Voidseer Crown", "Embercrest Helm", "Celestial Laurels", "Oracle Helm", "Astral Halo", "Eternity Crown", "Mythril Mindguard", "Cosmic Sovereign Helm"],
+        ["🧢", "🪖", "👑", "⛑️", "🎓", "☀️", "🌩️", "📿", "🗿", "🌅", "🌙", "💎", "⚡", "🔷", "⭐", "⏱️", "❄️", "🕳️", "🔥", "🌠", "🔭", "🪐", "♾️", "🧠", "🌌"],
+        180,
+        0.025
+      ),
+      chest: createGearSet(
+        "chest",
+        ["Apprentice Robes", "Arcweave Coat", "Aetherplate Vest", "Voidbound Mail", "Mantle of Cosmos", "Sunforged Cuirass", "Tempest Jerkin", "Moonlace Armor", "Runebound Breastplate", "Comet Ward", "Astral Harness", "Starlit Bulwark", "Duskweave Tunic", "Prism Carapace", "Embermantle", "Chrono Mail", "Frostwoven Raiment", "Abyssal Vest", "Aurora Plate", "Titan Shell", "Celestial Vestments", "Oracle Carapace", "Paradox Armor", "Mythic Starcoat", "Worldheart Aegis"],
+        ["👕", "🥋", "🦺", "🛡️", "🧥", "☀️", "🌩️", "🌙", "📜", "☄️", "🔭", "⭐", "🌒", "🔷", "🔥", "⏳", "❄️", "🕳️", "🌈", "🪨", "🌌", "🔮", "♾️", "🧬", "🌍"],
+        250,
+        0.035
+      ),
+      gloves: createGearSet(
+        "gloves",
+        ["Scribe Wraps", "Silk Grips", "Golem Gauntlets", "Fategrasps", "Starhands", "Sunthread Gloves", "Stormhide Mitts", "Moonwoven Grips", "Runebinder Gloves", "Comet Claws", "Aether Palmguards", "Dusk Talons", "Prism Knuckles", "Ember Fists", "Chrono Grips", "Frostgrasp", "Voidtouch Gloves", "Aurora Fingers", "Titan Gauntlets", "Celestial Graspers", "Oracle Touch", "Astral Handguards", "Paradox Talons", "Mythic Spellgloves", "Worldloom Mitts"],
+        ["🧤", "🪬", "🗿", "🔮", "⭐", "☀️", "🌩️", "🌙", "📜", "☄️", "💠", "🌒", "🔷", "🔥", "⏱️", "❄️", "🕳️", "🌈", "🪨", "🌌", "👁️", "🪐", "♾️", "🧬", "🌍"],
+        130,
+        0.02
+      ),
+      ring: createGearSet(
+        "ring",
+        ["Copper Band", "Moon Band", "Sigil Loop", "Nexus Ring", "Eternity Loop", "Sunband", "Tempest Ring", "Sage Coil", "Comet Loop", "Astral Ring", "Starseal Band", "Duskband", "Prism Ring", "Ember Loop", "Chrono Ring", "Frost Ring", "Void Loop", "Aurora Band", "Titan Circle", "Celestial Ring", "Oracle Loop", "Nebula Band", "Paradox Ring", "Mythic Halo Ring", "Worldthread Ring"],
+        ["💍", "🌙", "📿", "🔮", "♾️", "☀️", "🌩️", "📘", "☄️", "🪐", "⭐", "🌘", "🔷", "🔥", "⏳", "❄️", "🕳️", "🌈", "🪨", "🌌", "👁️", "🌠", "🔺", "🧬", "🌍"],
+        90,
+        0.015
+      ),
+      trinket: createGearSet(
+        "trinket",
+        ["Apprentice Charm", "Fortune Orb", "Echo Relic", "Horizon Idol", "Oracle Heart", "Sun Idol", "Tempest Totem", "Moon Relic", "Runic Fetish", "Comet Idol", "Astral Token", "Dusk Relic", "Prism Totem", "Ember Idol", "Chrono Sigil", "Frost Idol", "Void Totem", "Aurora Relic", "Titan Charm", "Celestial Idol", "Oracle Totem", "Nebula Relic", "Paradox Token", "Mythic Core", "Worldseed Charm"],
+        ["🧿", "🔮", "📿", "🗿", "❤️", "☀️", "🌩️", "🌙", "📜", "☄️", "🪐", "🌒", "🔷", "🔥", "⏱️", "❄️", "🕳️", "🌈", "🪨", "🌌", "👁️", "🌠", "♾️", "🧬", "🌍"],
+        140,
+        0.025
+      ),
+    };
+
+    const state = {
+      power: 0,
+      mana: 0,
+      totalPower: 0,
+      clickPower: 1,
+      buyAmount: 1,
+      activeQuickslot: 0,
+      quickslots: ["spell1", ...Array.from({ length: spellQuickslotCount - 1 }, () => null)],
+      spellCasts: 0,
+      activeSpells: {},
+      structures: Object.fromEntries(Object.keys(structureData).map((k) => [k, 0])),
+      equipment: Object.fromEntries(Object.keys(gearSlotData).map((k) => [k, null])),
+      ownedGear: {},
+      gearLevels: {},
+      equipmentLevelingEnabled: false,
+      levelProgressPower: 0,
+      upgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, 0])),
+      revealedUpgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, false])),
+      achievements: Object.fromEntries(achievementData.map((a) => [a.key, false])),
+      pets: Object.fromEntries(Object.keys(petData).map((k) => [k, { level: 1, xp: 0 }])),
+      petEquipped: ["emberFox", "astralOwl"],
+      lastTick: Date.now(),
+      lastSavedAt: null,
+      log: [{ text: "Welcome, wizard. Your tower awaits.", klass: "" }],
+      playerLevel: 1,
+      levelBonus: 0,
+      towerDefense: {
+        wave: 1,
+        breaches: 0,
+        enemyHp: 20,
+        enemyMaxHp: 20,
+        enemyProgress: 0,
+        spellPressure: 0,
+        spellFreezeSec: 0,
+        shotCooldown: 0,
+        placedTowers: [],
+        visualShots: [],
+        damageNumbers: [],
+      },
+    };
+
+    const els = {
+      power: document.getElementById("power"),
+      totalPower: document.getElementById("totalPower"),
+      mps: document.getElementById("mps"),
+      rank: document.getElementById("rank"),
+      playerLevel: document.getElementById("playerLevel"),
+      levelProfitBonus: document.getElementById("levelProfitBonus"),
+      levelProgressFill: document.getElementById("levelProgressFill"),
+      levelProgressText: document.getElementById("levelProgressText"),
+      manaMirror: document.getElementById("manaMirror"),
+      clickGain: document.getElementById("clickGain"),
+      activeSpellName: document.getElementById("activeSpellName"),
+      spellPower: document.getElementById("spellPower"),
+      spellTime: document.getElementById("spellTime"),
+      achievementPopups: document.getElementById("achievementPopups"),
+      clickBtn: document.getElementById("clickBtn"),
+      quickslots: document.getElementById("quickslots"),
+      tdWave: document.getElementById("tdWave"),
+      tdBreaches: document.getElementById("tdBreaches"),
+      tdDistance: document.getElementById("tdDistance"),
+      tdEnemyInfo: document.getElementById("tdEnemyInfo"),
+      tdDps: document.getElementById("tdDps"),
+      tdSpellBonus: document.getElementById("tdSpellBonus"),
+      tdReward: document.getElementById("tdReward"),
+      tdWebglCanvas: document.getElementById("tdWebglCanvas"),
+      tdEnemyUnit: document.getElementById("tdEnemyUnit"),
+      tdEnemyHealthFill: document.getElementById("tdEnemyHealthFill"),
+      tdDamageLayer: document.getElementById("tdDamageLayer"),
+      tdPowerWarning: document.getElementById("tdPowerWarning"),
+      spellSlotModal: document.getElementById("spellSlotModal"),
+      spellSlotModalTitle: document.getElementById("spellSlotModalTitle"),
+      spellSlotModalBody: document.getElementById("spellSlotModalBody"),
+      closeSpellSlotModalBtn: document.getElementById("closeSpellSlotModalBtn"),
+      saveBtn: document.getElementById("saveBtn"),
+      resetBtn: document.getElementById("resetBtn"),
+      buyToggle: document.getElementById("buyToggle"),
+      structures: document.getElementById("structures"),
+      equipmentSlots: document.getElementById("equipmentSlots"),
+      equipmentBonus: document.getElementById("equipmentBonus"),
+      equipmentLevelingToggle: document.getElementById("equipmentLevelingToggle"),
+      upgrades: document.getElementById("upgrades"),
+      showAllUpgradesBtn: document.getElementById("showAllUpgradesBtn"),
+      upgradeListModal: document.getElementById("upgradeListModal"),
+      closeUpgradeListBtn: document.getElementById("closeUpgradeListBtn"),
+      upgradeListBody: document.getElementById("upgradeListBody"),
+      gearModal: document.getElementById("gearModal"),
+      gearModalTitle: document.getElementById("gearModalTitle"),
+      gearModalBody: document.getElementById("gearModalBody"),
+      closeGearModalBtn: document.getElementById("closeGearModalBtn"),
+      achievements: document.getElementById("achievements"),
+      pets: document.getElementById("pets"),
+      petSlotsInfo: document.getElementById("petSlotsInfo"),
+      log: document.getElementById("log"),
+    };
+
+    let previousUpgradeRenderKey = "";
+    let activeGearSlot = null;
+    let activeSpellSlotPicker = 0;
+
+    function createTowerDefenseWebGLRenderer(canvas) {
+      const gl = canvas.getContext("webgl", { alpha: true, antialias: true });
+      if (!gl) {
+        return { render: () => {}, available: false };
+      }
+
+      const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+      gl.shaderSource(vertexShader, `
+        attribute vec3 a_position;
+        uniform mat4 u_matrix;
+        void main() {
+          gl_Position = u_matrix * vec4(a_position, 1.0);
+        }
+      `);
+      gl.compileShader(vertexShader);
+
+      const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+      gl.shaderSource(fragmentShader, `
+        precision mediump float;
+        uniform vec4 u_color;
+        void main() {
+          gl_FragColor = u_color;
+        }
+      `);
+      gl.compileShader(fragmentShader);
+
+      const program = gl.createProgram();
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+      gl.useProgram(program);
+
+      const positionLocation = gl.getAttribLocation(program, "a_position");
+      const matrixLocation = gl.getUniformLocation(program, "u_matrix");
+      const colorLocation = gl.getUniformLocation(program, "u_color");
+      const positionBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.enableVertexAttribArray(positionLocation);
+      gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
+      gl.enable(gl.DEPTH_TEST);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+      const cameraState = {
+        target: [0.1, -0.14, 0.12],
+        yaw: -0.05,
+        pitch: -0.71,
+        distance: 2.75,
+        rotating: false,
+        pointerId: null,
+        lastX: 0,
+        lastY: 0,
+      };
+
+      canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+      canvas.addEventListener("pointerdown", (event) => {
+        if (event.button !== 2) return;
+        event.preventDefault();
+        cameraState.rotating = true;
+        cameraState.pointerId = event.pointerId;
+        cameraState.lastX = event.clientX;
+        cameraState.lastY = event.clientY;
+        canvas.setPointerCapture(event.pointerId);
+      });
+      canvas.addEventListener("pointermove", (event) => {
+        if (!cameraState.rotating || event.pointerId !== cameraState.pointerId) return;
+        event.preventDefault();
+        const deltaX = event.clientX - cameraState.lastX;
+        const deltaY = event.clientY - cameraState.lastY;
+        cameraState.lastX = event.clientX;
+        cameraState.lastY = event.clientY;
+        cameraState.yaw += deltaX * 0.008;
+        cameraState.pitch = Math.max(-1.2, Math.min(-0.15, cameraState.pitch + (deltaY * 0.006)));
+      });
+      const endCameraRotate = (event) => {
+        if (event.pointerId !== cameraState.pointerId) return;
+        cameraState.rotating = false;
+        cameraState.pointerId = null;
+        if (canvas.hasPointerCapture(event.pointerId)) {
+          canvas.releasePointerCapture(event.pointerId);
+        }
+      };
+      canvas.addEventListener("pointerup", endCameraRotate);
+      canvas.addEventListener("pointercancel", endCameraRotate);
+
+      function resizeCanvas() {
+        const width = Math.max(1, Math.floor(canvas.clientWidth * window.devicePixelRatio));
+        const height = Math.max(1, Math.floor(canvas.clientHeight * window.devicePixelRatio));
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+        gl.viewport(0, 0, canvas.width, canvas.height);
+      }
+
+      const pathPoints = [
+        { x: 11, y: 14 },
+        { x: 45, y: 14 },
+        { x: 45, y: 50 },
+        { x: 84, y: 50 },
+        { x: 84, y: 77 },
+      ];
+
+      function pctToWorld(pointPct) {
+        return {
+          x: ((pointPct.x / 100) * 2) - 1,
+          z: ((pointPct.y / 100) * 2) - 1,
+        };
+      }
+
+      function normalize(v) {
+        const m = Math.hypot(v[0], v[1], v[2]) || 1;
+        return [v[0] / m, v[1] / m, v[2] / m];
+      }
+
+      function subtract(a, b) {
+        return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+      }
+
+      function cross(a, b) {
+        return [
+          (a[1] * b[2]) - (a[2] * b[1]),
+          (a[2] * b[0]) - (a[0] * b[2]),
+          (a[0] * b[1]) - (a[1] * b[0]),
+        ];
+      }
+
+      function perspective(fov, aspect, near, far) {
+        const f = 1 / Math.tan(fov / 2);
+        const rangeInv = 1 / (near - far);
+        return new Float32Array([
+          f / aspect, 0, 0, 0,
+          0, f, 0, 0,
+          0, 0, (near + far) * rangeInv, -1,
+          0, 0, near * far * rangeInv * 2, 0,
+        ]);
+      }
+
+      function lookAt(eye, target, up) {
+        const zAxis = normalize(subtract(eye, target));
+        const xAxis = normalize(cross(up, zAxis));
+        const yAxis = cross(zAxis, xAxis);
+
+        return new Float32Array([
+          xAxis[0], yAxis[0], zAxis[0], 0,
+          xAxis[1], yAxis[1], zAxis[1], 0,
+          xAxis[2], yAxis[2], zAxis[2], 0,
+          -((xAxis[0] * eye[0]) + (xAxis[1] * eye[1]) + (xAxis[2] * eye[2])),
+          -((yAxis[0] * eye[0]) + (yAxis[1] * eye[1]) + (yAxis[2] * eye[2])),
+          -((zAxis[0] * eye[0]) + (zAxis[1] * eye[1]) + (zAxis[2] * eye[2])),
+          1,
+        ]);
+      }
+
+      function multiplyMat4(a, b) {
+        const out = new Float32Array(16);
+        for (let i = 0; i < 4; i += 1) {
+          const ai0 = a[i];
+          const ai1 = a[i + 4];
+          const ai2 = a[i + 8];
+          const ai3 = a[i + 12];
+          out[i] = (ai0 * b[0]) + (ai1 * b[1]) + (ai2 * b[2]) + (ai3 * b[3]);
+          out[i + 4] = (ai0 * b[4]) + (ai1 * b[5]) + (ai2 * b[6]) + (ai3 * b[7]);
+          out[i + 8] = (ai0 * b[8]) + (ai1 * b[9]) + (ai2 * b[10]) + (ai3 * b[11]);
+          out[i + 12] = (ai0 * b[12]) + (ai1 * b[13]) + (ai2 * b[14]) + (ai3 * b[15]);
+        }
+        return out;
+      }
+
+      function drawTriangles(vertices, color, matrix) {
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
+        gl.uniformMatrix4fv(matrixLocation, false, matrix);
+        gl.uniform4fv(colorLocation, color);
+        gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 3);
+      }
+
+      function worldToScreen(point, matrix) {
+        const x = point[0];
+        const y = point[1];
+        const z = point[2];
+        const clipX = (matrix[0] * x) + (matrix[4] * y) + (matrix[8] * z) + matrix[12];
+        const clipY = (matrix[1] * x) + (matrix[5] * y) + (matrix[9] * z) + matrix[13];
+        const clipW = (matrix[3] * x) + (matrix[7] * y) + (matrix[11] * z) + matrix[15];
+        if (!Number.isFinite(clipW) || clipW <= 0) return null;
+        const ndcX = clipX / clipW;
+        const ndcY = clipY / clipW;
+        return {
+          x: (ndcX * 0.5) + 0.5,
+          y: 1 - ((ndcY * 0.5) + 0.5),
+        };
+      }
+
+      function boxVertices(center, size) {
+        const [cx, cy, cz] = center;
+        const [sx, sy, sz] = [size[0] / 2, size[1] / 2, size[2] / 2];
+        const x0 = cx - sx; const x1 = cx + sx;
+        const y0 = cy - sy; const y1 = cy + sy;
+        const z0 = cz - sz; const z1 = cz + sz;
+        return [
+          x0, y0, z1, x1, y0, z1, x0, y1, z1, x0, y1, z1, x1, y0, z1, x1, y1, z1,
+          x1, y0, z0, x0, y0, z0, x1, y1, z0, x1, y1, z0, x0, y0, z0, x0, y1, z0,
+          x0, y0, z0, x0, y0, z1, x0, y1, z0, x0, y1, z0, x0, y0, z1, x0, y1, z1,
+          x1, y0, z1, x1, y0, z0, x1, y1, z1, x1, y1, z1, x1, y0, z0, x1, y1, z0,
+          x0, y1, z1, x1, y1, z1, x0, y1, z0, x0, y1, z0, x1, y1, z1, x1, y1, z0,
+          x0, y0, z0, x1, y0, z0, x0, y0, z1, x0, y0, z1, x1, y0, z0, x1, y0, z1,
+        ];
+      }
+
+      function sphereVertices(center, radius, segments = 10, rings = 8) {
+        const verts = [];
+        for (let ring = 0; ring < rings; ring += 1) {
+          const v0 = ring / rings;
+          const v1 = (ring + 1) / rings;
+          const phi0 = (v0 * Math.PI) - (Math.PI / 2);
+          const phi1 = (v1 * Math.PI) - (Math.PI / 2);
+          for (let seg = 0; seg < segments; seg += 1) {
+            const u0 = (seg / segments) * Math.PI * 2;
+            const u1 = ((seg + 1) / segments) * Math.PI * 2;
+            const p0 = [center[0] + (Math.cos(phi0) * Math.cos(u0) * radius), center[1] + (Math.sin(phi0) * radius), center[2] + (Math.cos(phi0) * Math.sin(u0) * radius)];
+            const p1 = [center[0] + (Math.cos(phi0) * Math.cos(u1) * radius), center[1] + (Math.sin(phi0) * radius), center[2] + (Math.cos(phi0) * Math.sin(u1) * radius)];
+            const p2 = [center[0] + (Math.cos(phi1) * Math.cos(u0) * radius), center[1] + (Math.sin(phi1) * radius), center[2] + (Math.cos(phi1) * Math.sin(u0) * radius)];
+            const p3 = [center[0] + (Math.cos(phi1) * Math.cos(u1) * radius), center[1] + (Math.sin(phi1) * radius), center[2] + (Math.cos(phi1) * Math.sin(u1) * radius)];
+            verts.push(...p0, ...p2, ...p1, ...p1, ...p2, ...p3);
+          }
+        }
+        return verts;
+      }
+
+      function pathSlice(progress) {
+        const clamped = Math.max(0, Math.min(1, progress));
+        const segmentCount = pathPoints.length - 1;
+        const segmentFloat = clamped * segmentCount;
+        const segmentIndex = Math.min(segmentCount - 1, Math.floor(segmentFloat));
+        const t = segmentFloat - segmentIndex;
+        const result = [pathPoints[0]];
+        for (let i = 1; i <= segmentIndex; i += 1) result.push(pathPoints[i]);
+        if (segmentIndex < segmentCount) {
+          const from = pathPoints[segmentIndex];
+          const to = pathPoints[segmentIndex + 1];
+          result.push({ x: from.x + ((to.x - from.x) * t), y: from.y + ((to.y - from.y) * t) });
+        }
+        return result;
+      }
+
+      function segmentPrism(aPct, bPct, width, height) {
+        const a = pctToWorld(aPct);
+        const b = pctToWorld(bPct);
+        const dx = b.x - a.x;
+        const dz = b.z - a.z;
+        const len = Math.hypot(dx, dz) || 1;
+        const nx = -dz / len;
+        const nz = dx / len;
+        const hw = width / 2;
+        const y0 = -0.16;
+        const y1 = y0 + height;
+        const axl = [a.x + (nx * hw), y0, a.z + (nz * hw)];
+        const axr = [a.x - (nx * hw), y0, a.z - (nz * hw)];
+        const bxl = [b.x + (nx * hw), y0, b.z + (nz * hw)];
+        const bxr = [b.x - (nx * hw), y0, b.z - (nz * hw)];
+        const ayl = [axl[0], y1, axl[2]];
+        const ayr = [axr[0], y1, axr[2]];
+        const byl = [bxl[0], y1, bxl[2]];
+        const byr = [bxr[0], y1, bxr[2]];
+        return [
+          ...axl, ...bxl, ...ayl, ...ayl, ...bxl, ...byl,
+          ...bxr, ...axr, ...byr, ...byr, ...axr, ...ayr,
+          ...axr, ...axl, ...ayr, ...ayr, ...axl, ...ayl,
+          ...bxl, ...bxr, ...byl, ...byl, ...bxr, ...byr,
+          ...ayl, ...byl, ...ayr, ...ayr, ...byl, ...byr,
+          ...axr, ...bxr, ...axl, ...axl, ...bxr, ...bxl,
+        ];
+      }
+
+      function render(scene) {
+        resizeCanvas();
+        gl.clearColor(0.04, 0.05, 0.09, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        const proj = perspective(Math.PI / 3.2, canvas.width / canvas.height, 0.1, 16);
+        if (!Number.isFinite(cameraState.yaw) || !Number.isFinite(cameraState.pitch)) {
+          cameraState.yaw = -0.05;
+          cameraState.pitch = -0.71;
+        }
+        const target = cameraState.target;
+        const eye = [
+          target[0] + (Math.cos(cameraState.pitch) * Math.sin(cameraState.yaw) * cameraState.distance),
+          target[1] - (Math.sin(cameraState.pitch) * cameraState.distance),
+          target[2] + (Math.cos(cameraState.pitch) * Math.cos(cameraState.yaw) * cameraState.distance),
+        ];
+        const view = lookAt(eye, target, [0, 1, 0]);
+        const camera = multiplyMat4(proj, view);
+
+        drawTriangles(boxVertices([0, -0.28, 0], [2.3, 0.18, 2.3]), [0.16, 0.42, 0.2, 1], camera);
+
+        for (let i = 0; i < pathPoints.length - 1; i += 1) {
+          drawTriangles(segmentPrism(pathPoints[i], pathPoints[i + 1], 0.22, 0.05), scene.lowPower ? [0.44, 0.31, 0.21, 1] : [0.62, 0.48, 0.32, 1], camera);
+        }
+
+        const progressPath = pathSlice(scene.enemyProgress);
+        for (let i = 0; i < progressPath.length - 1; i += 1) {
+          drawTriangles(segmentPrism(progressPath[i], progressPath[i + 1], 0.12, 0.08), [0.98, 0.9, 0.7, 0.95], camera);
+        }
+
+        const towers = Array.isArray(scene.towers) && scene.towers.length ? scene.towers : [{ x: 84, y: 77 }];
+        for (const towerPct of towers) {
+          const tower = pctToWorld(towerPct);
+          drawTriangles(boxVertices([tower.x, -0.07, tower.z], [0.34, 0.18, 0.34]), [0.33, 0.28, 0.68, 1], camera);
+          drawTriangles(boxVertices([tower.x, 0.11, tower.z], [0.24, 0.38, 0.24]), [0.43, 0.32, 0.82, 1], camera);
+          drawTriangles(boxVertices([tower.x, 0.34, tower.z], [0.29, 0.12, 0.29]), [0.54, 0.44, 0.9, 1], camera);
+          drawTriangles(boxVertices([tower.x + 0.11, 0.41, tower.z + 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
+          drawTriangles(boxVertices([tower.x - 0.11, 0.41, tower.z + 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
+          drawTriangles(boxVertices([tower.x + 0.11, 0.41, tower.z - 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
+          drawTriangles(boxVertices([tower.x - 0.11, 0.41, tower.z - 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
+          drawTriangles(sphereVertices([tower.x, 0.48, tower.z], 0.085, 10, 8), [0.55, 0.71, 1, 0.95], camera);
+        }
+
+        const enemy = pctToWorld(scene.enemyPosition);
+        drawTriangles(sphereVertices([enemy.x, 0.01, enemy.z], 0.1, 14, 10), [0.95, 0.31, 0.25, 1], camera);
+        drawTriangles(sphereVertices([enemy.x, 0.13, enemy.z], 0.06, 12, 8), [1, 0.47, 0.36, 1], camera);
+        drawTriangles(boxVertices([enemy.x - 0.045, -0.09, enemy.z], [0.04, 0.1, 0.04]), [0.73, 0.2, 0.17, 1], camera);
+        drawTriangles(boxVertices([enemy.x + 0.045, -0.09, enemy.z], [0.04, 0.1, 0.04]), [0.73, 0.2, 0.17, 1], camera);
+        drawTriangles(boxVertices([enemy.x, 0.19, enemy.z], [0.11, 0.035, 0.08]), [0.72, 0.74, 0.8, 1], camera);
+        drawTriangles(boxVertices([enemy.x, 0.23, enemy.z], [0.06, 0.05, 0.06]), [0.66, 0.68, 0.74, 1], camera);
+        drawTriangles(sphereVertices([enemy.x - 0.11, 0.2, enemy.z], 0.03, 8, 6), [0.9, 0.86, 0.64, 1], camera);
+        drawTriangles(sphereVertices([enemy.x + 0.11, 0.2, enemy.z], 0.03, 8, 6), [0.9, 0.86, 0.64, 1], camera);
+
+        if (scene.freezeSec > 0) {
+          drawTriangles(sphereVertices([enemy.x, -0.03, enemy.z], 0.15, 10, 8), [0.55, 0.82, 1, 0.3], camera);
+        }
+
+        for (const shot of scene.shots) {
+          const p = pctToWorld(shot.pos);
+          const travelLift = 0.05 + ((1 - shot.progress) * 0.12);
+          drawTriangles(sphereVertices([p.x, travelLift, p.z], 0.025, 8, 6), [0.6, 0.9, 1, Math.max(0.25, 1 - shot.progress)], camera);
+        }
+
+        return {
+          enemyHudAnchor: worldToScreen([enemy.x, 0.32, enemy.z], camera),
+          damageAnchors: (scene.damageNumbers || []).map((num) => {
+            const damageWorld = pctToWorld(num.enemyPathPosition || scene.enemyPosition);
+            const rise = (num.age / Math.max(0.001, num.life)) * 0.22;
+            return worldToScreen([damageWorld.x, 0.24 + rise, damageWorld.z], camera);
+          }),
+        };
+      }
+
+      return { render, available: true };
+    }
+
+
+    const tdRenderer = window.__RUST_TD_ACTIVE
+      ? { render: () => ({ enemyHudAnchor: { x: 0, y: 0, visible: false }, damageAnchors: [] }), available: false }
+      : createTowerDefenseWebGLRenderer(els.tdWebglCanvas);
+
+    els.tdWebglCanvas.addEventListener("click", (event) => {
+      if (window.__RUST_TD_ACTIVE) return;
+      if (event.button !== 0) return;
+      const rect = els.tdWebglCanvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const x = ((event.clientX - rect.left) / rect.width) * 100;
+      const y = ((event.clientY - rect.top) / rect.height) * 100;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      if (state.towerDefense.placedTowers.length >= 12) {
+        addLog("Tower lane full. Remove pressure before placing more towers.", "warn");
+        return;
+      }
+      const placed = {
+        x: Math.max(8, Math.min(93, x)),
+        y: Math.max(8, Math.min(90, y)),
+      };
+      state.towerDefense.placedTowers.push(placed);
+      addLog(`Placed support tower at (${placed.x.toFixed(0)}%, ${placed.y.toFixed(0)}%).`, "ok");
+      render();
+    });
+
+    function format(num) {
+      if (num < 1000) return num.toFixed(1).replace(/\.0$/, "");
+      const units = ["K", "M", "B", "T", "Qa", "Qi"];
+      let value = num;
+      let idx = -1;
+      while (value >= 1000 && idx < units.length - 1) {
+        value /= 1000;
+        idx += 1;
+      }
+      return `${value.toFixed(2)}${units[idx]}`;
+    }
+
+    const arcaneRankTitles = [
+      "Novice", "Initiate", "Scholar", "Adept", "Master", "Archmage", "Grand Archmage",
+      ...Array.from({ length: 50 }, (_, idx) => `Eternal Arcanist ${idx + 1}`),
+    ];
+
+    const arcaneRankTiers = arcaneRankTitles.map((name, idx) => {
+      const threshold = idx === 0 ? 0 : Math.floor(300 * Math.pow(1.7, idx - 1));
+      return {
+        name,
+        threshold,
+        buffs: {
+          mpsMult: 1 + (idx * 0.03),
+          spellPowerMult: 1 + (idx * 0.025),
+          manaCostMult: Math.max(0.45, 1 - (idx * 0.01)),
+        },
+      };
+    });
+
+    function getArcaneRank(totalPower) {
+      let tier = arcaneRankTiers[0];
+      for (const entry of arcaneRankTiers) {
+        if (totalPower >= entry.threshold) tier = entry;
+        else break;
+      }
+      return tier;
+    }
+
+    function rankFromPower(totalPower) {
+      return getArcaneRank(totalPower).name;
+    }
+
+    function addLog(message, klass = "") {
+      const stamped = `[${new Date().toLocaleTimeString()}] ${message}`;
+      state.log.unshift({ text: stamped, klass });
+      state.log = state.log.slice(0, 90);
+    }
+
+
+    function upgradeLevel(key) {
+      return Number(state.upgrades[key] || 0);
+    }
+
+    function hasUpgrade(key) {
+      return upgradeLevel(key) > 0;
+    }
+
+    function getUpgradeCost(key) {
+      const up = upgradeData[key];
+      if (!up) return Infinity;
+      const level = upgradeLevel(key);
+      if (!up.repeatable && level > 0) return Infinity;
+      const growth = up.growth || 1;
+      return Math.floor(up.cost * Math.pow(growth, level));
+    }
+
+    function meetsUpgradeRequirement(key) {
+      const up = upgradeData[key];
+      if (!up || typeof up.requirement !== "function") return true;
+      return up.requirement(state);
+    }
+
+    function getStructureCost(key, levelOffset = 0) {
+      const data = structureData[key];
+      const level = state.structures[key] + levelOffset;
+      return Math.floor(data.baseCost * Math.pow(data.growth, level));
+    }
+
+    function getBulkStructureCost(key, amount) {
+      let total = 0;
+      for (let i = 0; i < amount; i += 1) {
+        total += getStructureCost(key, i);
+      }
+      return total;
+    }
+
+    function productionMultiplier() {
+      let mult = 1;
+      if (hasUpgrade("leylineBinding")) mult *= 1.25;
+      if (hasUpgrade("crystallizedThought")) mult *= 1.5;
+      if (hasUpgrade("archmageSigil")) mult *= 2.2;
+      if (hasUpgrade("planarRefinery")) mult *= 2.8;
+      if (hasUpgrade("singularityCore")) mult *= 4;
+      if (state.achievements.mana1k) mult *= 1.05;
+      if (state.achievements.mana20k) mult *= 1.1;
+      if (state.achievements.mana250k) mult *= 1.15;
+      if (state.achievements.mana2m) mult *= 1.25;
+      if (state.achievements.towerTycoon) mult *= 1.2;
+      return mult;
+    }
+
+    function getLevelUpCost(level) {
+      const safeLevel = Math.max(1, Math.floor(level));
+      return Math.floor(120 * Math.pow(1.9, safeLevel - 1));
+    }
+
+    function estimateLevelFromTotalPower(totalPower) {
+      let level = 1;
+      let progressPower = Math.max(0, totalPower);
+      while (level < 500) {
+        const cost = getLevelUpCost(level);
+        if (progressPower < cost) break;
+        progressPower -= cost;
+        level += 1;
+      }
+      return { level, progressPower };
+    }
+
+    function levelProgress(level, progressPower) {
+      const needed = getLevelUpCost(level);
+      const current = Math.max(0, progressPower);
+      const pct = Math.max(0, Math.min(1, current / needed));
+      return { needed, current, pct };
+    }
+
+    function getPetSlotLimit() {
+      return state.playerLevel >= 30 ? 3 : 2;
+    }
+
+    function petState(petKey) {
+      if (!state.pets[petKey]) state.pets[petKey] = { level: 1, xp: 0 };
+      return state.pets[petKey];
+    }
+
+    function petXpNeeded(level, xpScale = 1) {
+      return Math.floor(40 * Math.pow(1.5, Math.max(0, level - 1)) * xpScale);
+    }
+
+    function getPetModifiers() {
+      const mods = { production: 1, spell: 1, manaGain: 1, petXp: 1, offlineMana: 1 };
+      for (const petKey of state.petEquipped) {
+        const pet = petData[petKey];
+        if (!pet) continue;
+        const info = petState(petKey);
+        pet.apply(mods, pet.bonus(info.level));
+      }
+      return mods;
+    }
+
+    function grantPetXp(amount) {
+      if (amount <= 0 || state.petEquipped.length === 0) return;
+      const share = amount * getPetModifiers().petXp / state.petEquipped.length;
+      for (const petKey of state.petEquipped) {
+        const pet = petData[petKey];
+        if (!pet) continue;
+        const info = petState(petKey);
+        info.xp += share;
+        let leveled = false;
+        while (info.xp >= petXpNeeded(info.level, pet.xpScale)) {
+          info.xp -= petXpNeeded(info.level, pet.xpScale);
+          info.level += 1;
+          leveled = true;
+        }
+        if (leveled) addLog(`${pet.name} reached level ${info.level}.`, "ok");
+      }
+    }
+
+    function togglePetEquip(petKey) {
+      if (!petData[petKey] || !isPetUnlocked(petKey)) return;
+      if (state.petEquipped.includes(petKey)) {
+        state.petEquipped = state.petEquipped.filter((key) => key !== petKey);
+        return;
+      }
+      if (state.petEquipped.length >= getPetSlotLimit()) return;
+      state.petEquipped.push(petKey);
+    }
+
+    function getStructureSpecificMultiplier(structureKey) {
+      let mult = 1;
+      for (const [upKey, level] of Object.entries(state.upgrades)) {
+        if (!level) continue;
+        const up = upgradeData[upKey];
+        if (!up || up.structureTarget !== structureKey) continue;
+        mult *= 1 + (up.structureBonus || 0);
+      }
+      return mult;
+    }
+
+    function getMps() {
+      let total = 0;
+      for (const [key, amount] of Object.entries(state.structures)) {
+        total += amount * structureData[key].mps * getStructureSpecificMultiplier(key);
+      }
+      const infusionBonus = 1 + (upgradeLevel("manaInfusion") * 0.06);
+      const levelBonus = 1 + (Math.max(1, state.playerLevel || 1) - 1) * 0.05;
+      const rankBuff = getArcaneRank(state.totalPower).buffs.mpsMult;
+      return total * productionMultiplier() * infusionBonus * gearProfitMultiplier() * levelBonus * rankBuff * getPetModifiers().production;
+    }
+
+    function findGear(slot, gearId) {
+      return (gearData[slot] || []).find((gear) => gear.id === gearId) || null;
+    }
+
+    function gearProfitMultiplier() {
+      let bonus = 0;
+      for (const [slot, gearId] of Object.entries(state.equipment)) {
+        const gear = findGear(slot, gearId);
+        if (!gear) continue;
+        const level = gearLevel(gear.id);
+        const levelMult = 1 + ((level - 1) * 0.35);
+        bonus += gear.profitBonus * levelMult;
+      }
+      return 1 + bonus;
+    }
+
+    function gearLevel(gearId) {
+      return Math.max(1, Number(state.gearLevels[gearId] || 1));
+    }
+
+    function getGearLevelCost(gearId) {
+      const gear = Object.values(gearData).flat().find((entry) => entry.id === gearId);
+      if (!gear) return Infinity;
+      const level = gearLevel(gearId);
+      const base = Math.max(1000, Math.floor(gear.cost * 1.2));
+      return Math.floor(base * Math.pow(2.75, level - 1));
+    }
+
+    function applyLevelUps() {
+      let gained = 0;
+      while (state.levelProgressPower >= getLevelUpCost(state.playerLevel) && state.playerLevel < 500) {
+        state.levelProgressPower -= getLevelUpCost(state.playerLevel);
+        state.playerLevel += 1;
+        gained += 1;
+      }
+      state.levelBonus = (state.playerLevel - 1) * 0.05;
+      if (gained > 0) {
+        addLog(`Level up! Reached level ${state.playerLevel}. Profit bonus is now +${(state.levelBonus * 100).toFixed(0)}%.`, "ok");
+      }
+    }
+
+    function upgradeGearLevel(gearId) {
+      if (!state.equipmentLevelingEnabled) return;
+      if (!state.ownedGear[gearId]) return;
+      const cost = getGearLevelCost(gearId);
+      if (!canAfford(cost)) return;
+      state.power -= cost;
+      state.gearLevels[gearId] = gearLevel(gearId) + 1;
+      addLog(`Empowered ${gearId} to level ${state.gearLevels[gearId]} for ${format(cost)} power.`, "ok");
+      renderGearModal();
+      render();
+    }
+
+    function spellCost(key) {
+      const base = spellData[key].manaCost;
+      if (spellData[key].unlockLevel === 0) return 0;
+      const reduction = hasUpgrade("manaCompression") ? 0.8 : 1;
+      const singularityDiscount = hasUpgrade("singularityCore") ? 0.75 : 1;
+      const masteryDiscount = state.achievements.spellweaver ? 0.9 : 1;
+      const ritualReduction = Math.max(0.55, 1 - (upgradeLevel("ritualEconomy") * 0.03));
+      return Math.floor(base * reduction * singularityDiscount * masteryDiscount * ritualReduction * getArcaneRank(state.totalPower).buffs.manaCostMult);
+    }
+
+    function spellPower(key) {
+      let power = spellData[key].basePower;
+      if (key === "bolt") power = Math.max(power, state.clickPower);
+      if (hasUpgrade("runeEtching")) power *= 1.3;
+      if (hasUpgrade("tempestMastery") && (key === "lightning" || key === "meteor")) power *= 1.9;
+      if (hasUpgrade("celestialLattice")) power *= 2.2;
+      if (state.achievements.skyLord) power *= 1.15;
+      power *= 1 + (upgradeLevel("arcaneStudy") * 0.08);
+      power *= getArcaneRank(state.totalPower).buffs.spellPowerMult;
+      power *= getPetModifiers().spell;
+      return power;
+    }
+
+    function isSpellUnlocked(key) {
+      return state.playerLevel >= spellData[key].unlockLevel;
+    }
+
+    function selectedSpellKey() {
+      return state.quickslots[state.activeQuickslot] || null;
+    }
+
+    function tdTowerDps() {
+      const totalPowerScale = Math.pow(Math.max(1, state.totalPower), 0.22);
+      const structureScale = 1 + (Object.values(state.structures).reduce((sum, amount) => sum + amount, 0) * 0.02);
+      const spellScale = 1 + Math.min(2.5, state.towerDefense.spellPressure * 0.2);
+      const placedTowerScale = 1 + (Math.max(0, state.towerDefense.placedTowers.length) * 0.22);
+      return totalPowerScale * structureScale * spellScale * placedTowerScale;
+    }
+
+    function tdWaveValue(wave = state.towerDefense.wave) {
+      return 18 + (wave * 5);
+    }
+
+    function tdRequiredPower(wave = state.towerDefense.wave) {
+      return 10 + (wave * 2.8);
+    }
+
+    function tdPowerRatio() {
+      return tdTowerDps() / Math.max(1, tdRequiredPower(state.towerDefense.wave));
+    }
+
+    function spawnTdEnemy(nextWave = state.towerDefense.wave) {
+      const hp = tdWaveValue(nextWave) * Math.pow(1.2, Math.max(0, nextWave - 1));
+      state.towerDefense.enemyMaxHp = hp;
+      state.towerDefense.enemyHp = hp;
+      state.towerDefense.enemyProgress = 0;
+      state.towerDefense.visualShots = [];
+    }
+
+    function removeRandomOwnedStructure() {
+      const ownedStructures = Object.entries(state.structures)
+        .filter(([, amount]) => amount > 0)
+        .map(([key]) => key);
+      if (!ownedStructures.length) {
+        addLog("A demon breached the gate, but no owned structure was available to destroy.", "warn");
+        return;
+      }
+      const key = ownedStructures[Math.floor(Math.random() * ownedStructures.length)];
+      state.structures[key] = Math.max(0, state.structures[key] - 1);
+      addLog(`Breach penalty: ${structureData[key].name} was destroyed (${state.structures[key]} remaining).`, "warn");
+    }
+
+    function tdTowerPosition() {
+      return { x: 90, y: 81 };
+    }
+
+    function tdAllTowerPositions() {
+      return [tdTowerPosition(), ...(state.towerDefense.placedTowers || [])];
+    }
+
+    function addTdDamageNumber(value, position) {
+      if (value <= 0) return;
+      state.towerDefense.damageNumbers.push({
+        value,
+        x: position.x,
+        y: position.y - 2,
+        enemyPathPosition: { x: position.x, y: position.y },
+        life: 0.7,
+        age: 0,
+      });
+      if (state.towerDefense.damageNumbers.length > 20) {
+        state.towerDefense.damageNumbers.shift();
+      }
+    }
+
+    function spawnTowerShot(damage) {
+      const enemyPos = tdPathPosition(state.towerDefense.enemyProgress);
+      const towers = tdAllTowerPositions();
+      const from = towers[Math.floor(Math.random() * towers.length)] || tdTowerPosition();
+      state.towerDefense.visualShots.push({
+        from,
+        to: enemyPos,
+        age: 0,
+        life: 0.2,
+      });
+      addTdDamageNumber(damage, enemyPos);
+      if (state.towerDefense.visualShots.length > 24) {
+        state.towerDefense.visualShots.shift();
+      }
+    }
+
+    function tickTdVisualEffects(delta) {
+      state.towerDefense.visualShots = state.towerDefense.visualShots
+        .map((shot) => ({ ...shot, age: shot.age + delta }))
+        .filter((shot) => shot.age < shot.life);
+      state.towerDefense.damageNumbers = state.towerDefense.damageNumbers
+        .map((num) => ({ ...num, age: num.age + delta, y: num.y - (delta * 10) }))
+        .filter((num) => num.age < num.life);
+    }
+
+    function updateTowerDefense(delta) {
+      if (window.__RUST_TD_ACTIVE) return;
+      tickTdVisualEffects(delta);
+      if (state.towerDefense.breaches >= tdMaxBreaches) return;
+      if (state.towerDefense.spellFreezeSec > 0) {
+        state.towerDefense.spellFreezeSec = Math.max(0, state.towerDefense.spellFreezeSec - delta);
+      }
+      const powerRatio = tdPowerRatio();
+      const breachPressure = powerRatio < 1 ? 1 + ((1 - powerRatio) * 0.9) : 1;
+      const speed = (0.025 + (state.towerDefense.wave * 0.0035)) * breachPressure * (state.towerDefense.spellFreezeSec > 0 ? 0.2 : 1);
+      state.towerDefense.enemyProgress += speed * delta;
+      const dps = tdTowerDps();
+      const enemyHpBefore = state.towerDefense.enemyHp;
+      const totalTowerDamage = dps * delta;
+      state.towerDefense.enemyHp -= totalTowerDamage;
+
+      const shotInterval = 0.22;
+      state.towerDefense.shotCooldown += delta;
+      let elapsedForShots = 0;
+      while (state.towerDefense.shotCooldown >= shotInterval) {
+        state.towerDefense.shotCooldown -= shotInterval;
+        elapsedForShots += shotInterval;
+        const damageBeforeShot = Math.max(0, enemyHpBefore - (dps * Math.max(0, elapsedForShots - shotInterval)));
+        if (damageBeforeShot <= 0) break;
+        spawnTowerShot(Math.min(dps * shotInterval, damageBeforeShot));
+      }
+
+      if (state.towerDefense.enemyHp <= 0) {
+        const rewardPower = state.towerDefense.enemyMaxHp * 1.6;
+        const rewardMana = Math.max(1, state.towerDefense.wave * 1.15);
+        state.power += rewardPower;
+        state.totalPower += rewardPower;
+        state.levelProgressPower += rewardPower;
+        state.mana += rewardMana;
+        state.towerDefense.wave += 1;
+        spawnTdEnemy(state.towerDefense.wave);
+      } else if (state.towerDefense.enemyProgress >= 1) {
+        state.towerDefense.breaches += 1;
+        state.towerDefense.spellPressure = Math.max(0, state.towerDefense.spellPressure - 0.6);
+        removeRandomOwnedStructure();
+        spawnTdEnemy(state.towerDefense.wave);
+      }
+    }
+
+    function canAfford(cost) {
+      return state.power >= cost;
+    }
+
+    function canAffordMana(cost) {
+      return state.mana >= cost;
+    }
+
+    function buyStructure(key) {
+      const amount = state.buyAmount;
+      const totalCost = getBulkStructureCost(key, amount);
+      if (!canAfford(totalCost)) return;
+
+      state.power -= totalCost;
+      state.structures[key] += amount;
+      addLog(`Purchased ${amount} ${structureData[key].name}${amount > 1 ? "s" : ""}.`, "ok");
+      render();
+    }
+
+    function buyUpgrade(key) {
+      const up = upgradeData[key];
+      if (!up || !meetsUpgradeRequirement(key)) return;
+      const cost = getUpgradeCost(key);
+      if (!canAfford(cost)) return;
+
+      state.power -= cost;
+      state.upgrades[key] = upgradeLevel(key) + 1;
+      up.apply(state);
+      previousUpgradeRenderKey = "";
+
+      if (up.repeatable) {
+        addLog(`Studied ${up.name} (Level ${upgradeLevel(key)}).`, "ok");
+      } else {
+        addLog(`Learned upgrade: ${up.name}. ${up.effect}`, "ok");
+      }
+      render();
+    }
+
+    function buyGear(slot, gearId) {
+      const gear = findGear(slot, gearId);
+      if (!gear) return;
+      const alreadyOwned = Boolean(state.ownedGear[gearId]);
+      if (!alreadyOwned && !canAfford(gear.cost)) return;
+
+      if (!alreadyOwned) {
+        state.power -= gear.cost;
+        state.ownedGear[gearId] = true;
+        state.gearLevels[gearId] = Math.max(1, Number(state.gearLevels[gearId] || 1));
+        addLog(`Purchased ${gear.name} for ${format(gear.cost)} power.`, "ok");
+      }
+
+      state.equipment[slot] = gearId;
+      addLog(`Equipped ${gear.name} in ${gearSlotData[slot].name}.`, "warn");
+      renderGearModal();
+      render();
+    }
+
+    function unlockAchievement(key) {
+      if (state.achievements[key]) return;
+      state.achievements[key] = true;
+      const achievement = achievementData.find((a) => a.key === key);
+      if (key === "golem3") state.clickPower += 15;
+      if (key === "voidCaller") state.clickPower += 40;
+      addLog(`Achievement unlocked: ${achievement.name} (${achievement.reward})`, "ok");
+      showAchievementPopup(achievement);
+    }
+
+    function canClaimAchievement(key) {
+      const achievement = achievementData.find((entry) => entry.key === key);
+      if (!achievement || state.achievements[key]) return false;
+      return achievement.test(state);
+    }
+
+    function claimAchievement(key) {
+      if (!canClaimAchievement(key)) return;
+      unlockAchievement(key);
+      render();
+    }
+
+    function autoUnlockAchievements() {
+      let changed = false;
+      for (const achievement of achievementData) {
+        if (!state.achievements[achievement.key] && achievement.test(state)) {
+          unlockAchievement(achievement.key);
+          changed = true;
+        }
+      }
+      return changed;
+    }
+
+    function showAchievementPopup(achievement) {
+      const popup = document.createElement("div");
+      popup.className = "achievement-popup";
+      popup.innerHTML = `
+        <img src="${achievement.image}" alt="${achievement.name} icon" />
+        <div>
+          <strong>Achievement Unlocked</strong>
+          <div>${achievement.name}</div>
+        </div>
+      `;
+      els.achievementPopups.appendChild(popup);
+      setTimeout(() => {
+        popup.remove();
+      }, 3200);
+    }
+
+    function activeSpellRemainingMs(spellKey, now = Date.now()) {
+      const entry = state.activeSpells[spellKey];
+      if (!entry) return 0;
+      return Math.max(0, Number(entry.expiresAt || 0) - now);
+    }
+
+    function cleanupExpiredSpells(now = Date.now()) {
+      for (const key of Object.keys(state.activeSpells)) {
+        if (activeSpellRemainingMs(key, now) <= 0) delete state.activeSpells[key];
+      }
+    }
+
+    function getActiveSpellPps(now = Date.now()) {
+      cleanupExpiredSpells(now);
+      let bonus = 0;
+      for (const entry of Object.values(state.activeSpells)) {
+        bonus += Number(entry.powerPerSecond || 0);
+      }
+      return bonus;
+    }
+
+    function castSpell(spellKey = selectedSpellKey()) {
+      const key = spellData[spellKey] ? spellKey : null;
+      if (!key) return;
+      if (!isSpellUnlocked(key)) return;
+      const cost = spellCost(key);
+      if (!canAffordMana(cost)) return;
+
+      const spell = spellData[key];
+      const pps = spellPower(key);
+      const now = Date.now();
+      state.mana -= cost;
+      state.activeSpells[key] = {
+        powerPerSecond: pps,
+        expiresAt: now + (spell.durationSec * 1000),
+      };
+      state.spellCasts += 1;
+      state.towerDefense.spellPressure = Math.min(12, state.towerDefense.spellPressure + 0.55);
+      state.towerDefense.spellFreezeSec = Math.max(state.towerDefense.spellFreezeSec, 0.35 + (pps / Math.max(1, state.towerDefense.enemyMaxHp)));
+      state.towerDefense.enemyHp = Math.max(0, state.towerDefense.enemyHp - (pps * 0.9));
+      grantPetXp(Math.max(1, pps * 0.02));
+      state.activeQuickslot = Math.min(Math.max(0, state.activeQuickslot), spellQuickslotCount - 1);
+      if (state.spellCasts % 25 === 0) {
+        addLog(`Arcane rhythm! ${state.spellCasts} spells cast so far.`, "warn");
+      }
+      render();
+    }
+
+    function gatherPower() {
+      const gain = Math.max(1, state.clickPower);
+      state.power += gain;
+      state.totalPower += gain;
+      state.levelProgressPower += gain;
+      grantPetXp(Math.max(0.5, gain * 0.015));
+      applyLevelUps();
+      render();
+    }
+
+    function saveGame(showToast = true) {
+      const payload = { ...state, totalMana: state.totalPower, power: state.power, mana: state.mana, lastTick: Date.now(), log: state.log.slice(0, 60) };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      state.lastSavedAt = Date.now();
+      if (showToast) addLog("Game saved.", "ok");
+      render();
+    }
+
+    function normalizeLoadedState(data) {
+      state.power = Number((data.power ?? data.mana) || 0);
+      state.mana = Number(data.mana || 0);
+      state.totalPower = Number((data.totalPower ?? data.totalMana) || 0);
+      state.clickPower = Number(data.clickPower || 1);
+      state.buyAmount = [1, 10, 25].includes(Number(data.buyAmount)) ? Number(data.buyAmount) : 1;
+      state.activeQuickslot = Number.isInteger(data.activeQuickslot) ? Math.min(Math.max(0, data.activeQuickslot), spellQuickslotCount - 1) : 0;
+      const loadedSlots = Array.isArray(data.quickslots) ? data.quickslots : [];
+      state.quickslots = Array.from({ length: spellQuickslotCount }, (_, idx) => {
+        const key = loadedSlots[idx];
+        return typeof key === "string" && spellData[key] ? key : null;
+      });
+      if (!Array.isArray(data.quickslots) && typeof data.activeSpell === "string" && spellData[data.activeSpell]) {
+        state.quickslots[0] = data.activeSpell;
+      }
+      if (!state.quickslots.some((key) => typeof key === "string" && spellData[key])) {
+        state.quickslots[0] = "spell1";
+      }
+      state.spellCasts = Number(data.spellCasts || 0);
+      state.activeSpells = {};
+      for (const [key, entry] of Object.entries(data.activeSpells || {})) {
+        if (!spellData[key]) continue;
+        const expiresAt = Number(entry?.expiresAt || 0);
+        const powerPerSecond = Number(entry?.powerPerSecond || 0);
+        if (expiresAt > Date.now() && powerPerSecond > 0) {
+          state.activeSpells[key] = { expiresAt, powerPerSecond };
+        }
+      }
+
+      for (const key of Object.keys(state.structures)) {
+        state.structures[key] = Number(data.structures?.[key] || 0);
+      }
+      for (const key of Object.keys(state.equipment)) {
+        const gearId = data.equipment?.[key] || null;
+        state.equipment[key] = findGear(key, gearId) ? gearId : null;
+      }
+      state.ownedGear = {};
+      state.gearLevels = {};
+      state.equipmentLevelingEnabled = Boolean(data.equipmentLevelingEnabled);
+      const loadedOwnedGear = data.ownedGear || {};
+      for (const slotItems of Object.values(gearData)) {
+        for (const gear of slotItems) {
+          if (loadedOwnedGear[gear.id]) state.ownedGear[gear.id] = true;
+          if (state.ownedGear[gear.id]) {
+            const loadedLevel = Number(data.gearLevels?.[gear.id] || 1);
+            state.gearLevels[gear.id] = Math.max(1, loadedLevel);
+          }
+        }
+      }
+      for (const equippedId of Object.values(state.equipment)) {
+        if (equippedId) {
+          state.ownedGear[equippedId] = true;
+          state.gearLevels[equippedId] = Math.max(1, Number(state.gearLevels[equippedId] || 1));
+        }
+      }
+      for (const key of Object.keys(state.upgrades)) {
+        const loaded = data.upgrades?.[key];
+        state.upgrades[key] = loaded === true ? 1 : Number(loaded || 0);
+      }
+      for (const key of Object.keys(state.revealedUpgrades)) {
+        state.revealedUpgrades[key] = Boolean(data.revealedUpgrades?.[key]) || state.upgrades[key] > 0;
+      }
+      previousUpgradeRenderKey = "";
+      for (const key of Object.keys(state.achievements)) {
+        state.achievements[key] = Boolean(data.achievements?.[key]);
+      }
+      for (const petKey of Object.keys(petData)) {
+        const loadedPet = data.pets?.[petKey];
+        state.pets[petKey] = {
+          level: Math.max(1, Math.floor(Number(loadedPet?.level || 1))),
+          xp: Math.max(0, Number(loadedPet?.xp || 0)),
+        };
+      }
+      const loadedEquipped = Array.isArray(data.petEquipped)
+        ? data.petEquipped.filter((petKey) => petData[petKey])
+        : [];
+      const slotLimit = getPetSlotLimit();
+      state.petEquipped = loadedEquipped.slice(0, slotLimit);
+      if (state.petEquipped.length === 0) {
+        state.petEquipped = Object.keys(petData).slice(0, slotLimit);
+      }
+      const loadedLevel = Number(data.playerLevel || 0);
+      const loadedProgress = Number(data.levelProgressPower);
+      if (loadedLevel > 0) {
+        state.playerLevel = Math.floor(loadedLevel);
+        state.levelProgressPower = Number.isFinite(loadedProgress) ? Math.max(0, loadedProgress) : 0;
+      } else {
+        const estimated = estimateLevelFromTotalPower(state.totalPower);
+        state.playerLevel = estimated.level;
+        state.levelProgressPower = estimated.progressPower;
+      }
+      state.levelBonus = Number.isFinite(data.levelBonus) ? Number(data.levelBonus) : (state.playerLevel - 1) * 0.05;
+      const loadedTd = data.towerDefense || {};
+      const loadedPlacedTowers = Array.isArray(loadedTd.placedTowers)
+        ? loadedTd.placedTowers
+          .map((tower) => ({
+            x: Math.max(8, Math.min(93, Number(tower?.x))),
+            y: Math.max(8, Math.min(90, Number(tower?.y))),
+          }))
+          .filter((tower) => Number.isFinite(tower.x) && Number.isFinite(tower.y))
+          .slice(0, 12)
+        : [];
+      state.towerDefense = {
+        wave: Math.max(1, Math.floor(Number(loadedTd.wave || 1))),
+        breaches: Math.max(0, Math.floor(Number(loadedTd.breaches || 0))),
+        enemyHp: Math.max(1, Number(loadedTd.enemyHp || tdWaveValue(Number(loadedTd.wave || 1)))),
+        enemyMaxHp: Math.max(1, Number(loadedTd.enemyMaxHp || tdWaveValue(Number(loadedTd.wave || 1)))),
+        enemyProgress: Math.min(1, Math.max(0, Number(loadedTd.enemyProgress || 0))),
+        spellPressure: Math.max(0, Number(loadedTd.spellPressure || 0)),
+        spellFreezeSec: Math.max(0, Number(loadedTd.spellFreezeSec || 0)),
+        shotCooldown: 0,
+        placedTowers: loadedPlacedTowers,
+        visualShots: [],
+        damageNumbers: [],
+      };
+
+      state.log = Array.isArray(data.log) && data.log.length
+        ? data.log.map((entry) => (typeof entry === "string" ? { text: entry, klass: "" } : entry))
+        : [{ text: "Welcome back, wizard.", klass: "" }];
+    }
+
+    function applyOfflineProgress(previousTick) {
+      if (!previousTick) return;
+      const elapsedSeconds = Math.min((Date.now() - previousTick) / 1000, 6 * 60 * 60);
+      if (elapsedSeconds <= 2) return;
+      const gained = getMps() * elapsedSeconds;
+      if (gained <= 0) return;
+
+      state.power += gained;
+      state.totalPower += gained;
+      state.levelProgressPower += gained;
+      state.mana += gained * 0.25 * getPetModifiers().offlineMana;
+      grantPetXp(gained * 0.0012);
+      applyLevelUps();
+      addLog(`You were away for ${Math.floor(elapsedSeconds)}s and gained ${format(gained)} power and ${format(gained * 0.25 * getPetModifiers().offlineMana)} mana.`, "warn");
+    }
+
+    function loadGame() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+
+      try {
+        const parsed = JSON.parse(raw);
+        const previousTick = Number(parsed.lastTick);
+        normalizeLoadedState(parsed);
+        applyOfflineProgress(previousTick);
+        state.lastTick = Date.now();
+        addLog("Save loaded.", "ok");
+      } catch {
+        addLog("Save file corrupted. Starting fresh.", "danger");
+      }
+    }
+
+    function resetGame() {
+      localStorage.removeItem(STORAGE_KEY);
+      location.reload();
+    }
+
+    function renderStructures() {
+      els.structures.innerHTML = "";
+      for (const [key, data] of Object.entries(structureData)) {
+        const owned = state.structures[key];
+        const nextCost = getStructureCost(key, 0);
+        const bulkCost = getBulkStructureCost(key, state.buyAmount);
+        const disabled = !canAfford(bulkCost);
+
+        const card = document.createElement("div");
+        card.className = "item";
+        card.innerHTML = `
+          <img class="item-icon" src="${data.image}" alt="${data.name} icon" title="${data.tooltip}" />
+          <div>
+            <div class="name">${data.name} <span class="pill">Owned: ${owned}</span></div>
+            <div class="meta">+${format(data.mps)}/sec each • Next: ${format(nextCost)} power</div>
+            <div class="meta">Buy ${state.buyAmount}: ${format(bulkCost)} power</div>
+          </div>
+          <button ${disabled ? "disabled" : ""}>Buy x${state.buyAmount}</button>
+        `;
+
+        const buyButton = card.querySelector("button");
+        buyButton.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          buyStructure(key);
+        });
+        els.structures.appendChild(card);
+      }
+    }
+
+    function renderEquipment() {
+      els.equipmentSlots.innerHTML = "";
+      const totalBonusPct = (gearProfitMultiplier() - 1) * 100;
+      els.equipmentBonus.textContent = `Current gear bonus: +${totalBonusPct.toFixed(1)}% structure profits`;
+
+      for (const [slot, slotMeta] of Object.entries(gearSlotData)) {
+        const gearId = state.equipment[slot];
+        const gear = findGear(slot, gearId);
+
+        const slotButton = document.createElement("button");
+        slotButton.type = "button";
+        slotButton.className = `gear-slot ${gear ? "" : "empty"}`;
+        const level = gear ? gearLevel(gear.id) : 0;
+        const leveledBonus = gear ? gear.profitBonus * (1 + ((level - 1) * 0.35)) : 0;
+        slotButton.innerHTML = `
+          <div class="slot-type">${slotMeta.icon} ${slotMeta.name}</div>
+          <div class="slot-equipped">${gear ? `<img src="${gear.icon}" alt="${gear.name} icon" />` : ""}<div class="slot-item">${gear ? gear.name : "Empty Slot"}</div></div>
+          <div class="slot-profit">${gear ? `Lv ${level} • +${(leveledBonus * 100).toFixed(1)}% profit` : "Click to browse gear"}</div>
+        `;
+        slotButton.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          openGearModal(slot);
+        });
+        els.equipmentSlots.appendChild(slotButton);
+      }
+    }
+
+    function renderPets() {
+      els.pets.innerHTML = "";
+      const slotLimit = getPetSlotLimit();
+      els.petSlotsInfo.textContent = `Equipped: ${state.petEquipped.length} / ${slotLimit} slots`;
+
+      const petEntries = Object.entries(petData).sort(([leftKey, leftPet], [rightKey, rightPet]) => {
+        const leftEquipped = state.petEquipped.includes(leftKey);
+        const rightEquipped = state.petEquipped.includes(rightKey);
+        if (leftEquipped !== rightEquipped) return leftEquipped ? -1 : 1;
+        const leftUnlocked = isPetUnlocked(leftKey);
+        const rightUnlocked = isPetUnlocked(rightKey);
+        if (leftUnlocked !== rightUnlocked) return leftUnlocked ? -1 : 1;
+        if ((leftPet.tier || 1) !== (rightPet.tier || 1)) return (leftPet.tier || 1) - (rightPet.tier || 1);
+        return leftPet.name.localeCompare(rightPet.name);
+      });
+
+      for (const [petKey, pet] of petEntries) {
+        const info = petState(petKey);
+        const needed = petXpNeeded(info.level, pet.xpScale);
+        const pct = Math.max(0, Math.min(100, (info.xp / needed) * 100));
+        const bonusPct = pet.bonus(info.level) * 100;
+        const equipped = state.petEquipped.includes(petKey);
+        const unlocked = isPetUnlocked(petKey);
+        const blocked = !equipped && (state.petEquipped.length >= slotLimit || !unlocked);
+        const unlockText = !unlocked && pet.unlockFrom
+          ? `Unlock: ${petData[pet.unlockFrom].name} Lv 99`
+          : "";
+        const card = document.createElement("div");
+        card.className = "item";
+        card.innerHTML = `
+          <img class="item-icon" src="${pet.image}" alt="${pet.name} icon" title="${pet.bonusText}" />
+          <div>
+            <div class="name">${pet.name} ${equipped ? '<span class="pill">Equipped</span>' : ""}</div>
+            <div class="meta">Tier ${pet.tier || 1}</div>
+            <div class="meta">Lv ${info.level} • ${pet.bonusText}: +${bonusPct.toFixed(1)}%</div>
+            <div class="meta">XP ${format(info.xp)} / ${format(needed)}</div>
+            ${unlockText ? `<div class="meta">${unlockText}</div>` : ""}
+            <div class="level-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
+          </div>
+          <button ${blocked ? "disabled" : ""}>${equipped ? "Unequip" : (unlocked ? "Equip" : "Locked")}</button>
+        `;
+
+        card.querySelector("button").addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          togglePetEquip(petKey);
+          render();
+        });
+        els.pets.appendChild(card);
+      }
+    }
+
+    function renderUpgrades() {
+      const visibleEntries = [];
+      for (const [key, up] of Object.entries(upgradeData)) {
+        const level = upgradeLevel(key);
+        const nextCost = getUpgradeCost(key);
+        const requirementMet = meetsUpgradeRequirement(key);
+        const revealFactor = up.repeatable ? 0.5 : 1;
+        const canReveal = Number.isFinite(nextCost) && state.power >= nextCost * revealFactor;
+        const alreadyRevealed = Boolean(state.revealedUpgrades[key]) || level > 0;
+        if (!alreadyRevealed && requirementMet && canReveal) {
+          state.revealedUpgrades[key] = true;
+        }
+        if ((!up.repeatable && level > 0) || !requirementMet || (!state.revealedUpgrades[key] && !canReveal)) continue;
+        visibleEntries.push({ key, up, nextCost, requirementMet });
+      }
+
+      const renderKey = JSON.stringify(visibleEntries.map((entry) => {
+        const affordable = canAfford(entry.nextCost);
+        return [entry.key, affordable ? 1 : 0];
+      }));
+      if (renderKey === previousUpgradeRenderKey) return;
+      previousUpgradeRenderKey = renderKey;
+
+      els.upgrades.innerHTML = "";
+      for (const { key, up, nextCost, requirementMet } of visibleEntries) {
+        const disabled = !requirementMet || !canAfford(nextCost);
+        const card = document.createElement("div");
+        card.className = `upgrade-icon${disabled ? " disabled" : ""}`;
+        card.tabIndex = 0;
+        card.setAttribute("role", "button");
+        card.setAttribute("aria-label", `Buy upgrade ${up.name}`);
+        card.setAttribute("aria-disabled", disabled ? "true" : "false");
+        card.innerHTML = `
+          <img class="item-icon" src="${up.image}" alt="${up.name} icon" />
+          <div class="upgrade-tooltip">
+            <b>${up.name}</b>
+            <div>${up.effect}</div>
+            ${up.repeatable ? `<div>Level: ${upgradeLevel(key)}</div>` : ""}
+            <div>Cost: ${Number.isFinite(nextCost) ? format(nextCost) : "--"} power</div>
+            ${up.requirementText ? `<div>Req: ${up.requirementText}${requirementMet ? "" : " (not met)"}</div>` : ""}
+            <div>${up.tooltip}</div>
+          </div>
+        `;
+
+        card.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (disabled) return;
+          buyUpgrade(key);
+        });
+
+        card.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          if (disabled) return;
+          buyUpgrade(key);
+        });
+
+        els.upgrades.appendChild(card);
+      }
+
+      if (visibleEntries.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "upgrade-empty";
+        empty.textContent = "Earn more power and structures to reveal your next upgrades.";
+        els.upgrades.appendChild(empty);
+      }
+    }
+
+    function renderUpgradeListModal() {
+      els.upgradeListBody.innerHTML = "";
+      const entries = Object.entries(upgradeData).map(([key, up]) => {
+        const level = upgradeLevel(key);
+        const requirementMet = meetsUpgradeRequirement(key);
+        const nextCost = getUpgradeCost(key);
+        const lockedByRequirement = !requirementMet;
+        const purchased = level > 0 && !up.repeatable;
+        return { key, up, level, requirementMet, nextCost, lockedByRequirement, purchased };
+      });
+
+      for (const entry of entries) {
+        const row = document.createElement("div");
+        row.className = "upgrade-modal-item";
+        const unlockText = entry.up.requirementText
+          ? `${entry.up.requirementText}${entry.requirementMet ? "" : " (not met)"}`
+          : "Reach enough power to reveal and afford this upgrade.";
+        row.innerHTML = `
+          <img class="item-icon" src="${entry.up.image}" alt="${entry.up.name} icon" />
+          <div>
+            <div class="name">${entry.up.name}</div>
+            <div class="meta">${entry.up.effect}</div>
+            <div class="meta">Cost: ${Number.isFinite(entry.nextCost) ? format(entry.nextCost) : "--"} power</div>
+            <div class="meta">How to unlock: ${unlockText}</div>
+            <div class="meta">${entry.up.tooltip}</div>
+          </div>
+          <div class="meta">${entry.purchased ? "Bought" : entry.lockedByRequirement ? "Locked" : "Available"}</div>
+        `;
+        els.upgradeListBody.appendChild(row);
+      }
+    }
+
+    function openGearModal(slot) {
+      activeGearSlot = slot;
+      renderGearModal();
+      els.gearModal.classList.remove("hidden");
+    }
+
+    function closeGearModal() {
+      activeGearSlot = null;
+      els.gearModal.classList.add("hidden");
+    }
+
+    function renderGearModal() {
+      if (!activeGearSlot || !gearSlotData[activeGearSlot]) return;
+      const slotMeta = gearSlotData[activeGearSlot];
+      els.gearModalTitle.textContent = `${slotMeta.icon} ${slotMeta.name} Gear`;
+      els.gearModalBody.innerHTML = "";
+
+      const equippedId = state.equipment[activeGearSlot];
+      for (const gear of gearData[activeGearSlot]) {
+        const owned = Boolean(state.ownedGear[gear.id]);
+        const equipped = equippedId === gear.id;
+        const affordable = canAfford(gear.cost);
+        const disabled = !owned && !affordable;
+        const level = gearLevel(gear.id);
+        const levelCost = getGearLevelCost(gear.id);
+        const canLevel = state.equipmentLevelingEnabled && owned && canAfford(levelCost);
+        const leveledBonus = gear.profitBonus * (1 + ((level - 1) * 0.35));
+
+        const row = document.createElement("div");
+        row.className = "upgrade-modal-item";
+        row.innerHTML = `
+          <img class="item-icon" src="${gear.icon || webIcon("🧰")}" alt="${gear.name} icon" />
+          <div>
+            <div class="name">${gear.name} ${equipped ? '<span class="pill">Equipped</span>' : ""} ${owned && !equipped ? '<span class="pill">Owned</span>' : ""}</div>
+            <div class="meta">Profit boost: +${(leveledBonus * 100).toFixed(1)}% (base ${(gear.profitBonus * 100).toFixed(1)}%)</div>
+            <div class="meta">Cost: ${format(gear.cost)} power</div>
+            <div class="meta">Level: ${level}${state.equipmentLevelingEnabled && owned ? ` • Next level cost: ${format(levelCost)} power` : ""}</div>
+          </div>
+          <div style="display:grid; gap:6px;">
+            <button class="gear-buy-btn" ${disabled || equipped ? "disabled" : ""}>${owned ? "Equip" : "Buy"}</button>
+            <button class="gear-level-btn" ${!canLevel ? "disabled" : ""}>Level Up</button>
+          </div>
+        `;
+        row.querySelector(".gear-buy-btn").addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (disabled || equipped) return;
+          buyGear(activeGearSlot, gear.id);
+        });
+        row.querySelector(".gear-level-btn").addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!canLevel) return;
+          upgradeGearLevel(gear.id);
+        });
+        els.gearModalBody.appendChild(row);
+      }
+    }
+
+    function openUpgradeListModal() {
+      renderUpgradeListModal();
+      els.upgradeListModal.classList.remove("hidden");
+    }
+
+    function closeUpgradeListModal() {
+      els.upgradeListModal.classList.add("hidden");
+    }
+
+    function renderQuickslots() {
+      els.quickslots.innerHTML = "";
+      for (let idx = 0; idx < spellQuickslotCount; idx += 1) {
+        const key = state.quickslots[idx];
+        const spell = key ? spellData[key] : null;
+        const unlocked = spell ? isSpellUnlocked(key) : false;
+        const cost = spell ? spellCost(key) : 0;
+        const canCast = spell && unlocked && canAffordMana(cost);
+
+        const slotWrap = document.createElement("div");
+        slotWrap.className = "quickslot-wrap";
+
+        const slot = document.createElement("button");
+        slot.type = "button";
+        slot.className = `quickslot ${state.activeQuickslot === idx ? "active" : ""}`;
+        slot.innerHTML = `
+          <span class="slot-key">${idx + 1}</span>
+          <img src="${spell ? spell.image : webIcon("❔")}" alt="${spell ? spell.name : "Unassigned spell slot"} icon" />
+          <span>${spell ? spell.name : "Empty Slot"}</span>
+          <span class="slot-cost">${spell ? (unlocked ? `${format(cost)} mana • ${activeSpellRemainingMs(key) > 0 ? `${(activeSpellRemainingMs(key) / 1000).toFixed(1)}s left` : `${spell.durationSec.toFixed(0)}s duration`}` : `Unlock Lv ${spell.unlockLevel}`) : "Click to assign"}</span>
+        `;
+        slot.title = spell ? (unlocked ? `Cast ${spell.name}` : `Unlock at level ${spell.unlockLevel}`) : "No spell assigned";
+        slot.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          state.activeQuickslot = idx;
+          castSpell(state.quickslots[idx]);
+          render();
+        });
+        slot.disabled = false;
+        if (spell && !canCast) slot.classList.add("disabled");
+
+        const assignBtn = document.createElement("button");
+        assignBtn.type = "button";
+        assignBtn.className = "btn-ghost quickslot-assign";
+        assignBtn.textContent = "Assign";
+        assignBtn.title = `Assign spell to slot ${idx + 1}`;
+        assignBtn.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          state.activeQuickslot = idx;
+          openSpellSlotModal(idx);
+        });
+
+        slotWrap.appendChild(slot);
+        slotWrap.appendChild(assignBtn);
+        els.quickslots.appendChild(slotWrap);
+      }
+    }
+
+    function openSpellSlotModal(slotIndex) {
+      activeSpellSlotPicker = slotIndex;
+      const slotLabel = slotIndex + 1;
+      els.spellSlotModalTitle.textContent = `Assign Spell to Slot ${slotLabel}`;
+      renderSpellSlotModal();
+      els.spellSlotModal.classList.remove("hidden");
+    }
+
+    function closeSpellSlotModal() {
+      els.spellSlotModal.classList.add("hidden");
+    }
+
+    function assignSpellToSlot(slotIndex, spellKey) {
+      state.quickslots[slotIndex] = spellKey;
+      state.activeQuickslot = slotIndex;
+      render();
+    }
+
+    function renderSpellSlotModal() {
+      els.spellSlotModalBody.innerHTML = "";
+
+      const clearRow = document.createElement("div");
+      clearRow.className = "item";
+      clearRow.innerHTML = `<img class="item-icon" src="${webIcon("❌")}" alt="clear slot icon" /><div><div class="name">Clear Slot</div><div class="meta">Remove assigned spell from this quickslot.</div></div><button type="button">Clear</button>`;
+      clearRow.querySelector("button").addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        assignSpellToSlot(activeSpellSlotPicker, null);
+        closeSpellSlotModal();
+      });
+      els.spellSlotModalBody.appendChild(clearRow);
+
+      for (const [key, spell] of Object.entries(spellData)) {
+        const unlocked = isSpellUnlocked(key);
+        const row = document.createElement("div");
+        row.className = "item";
+        row.innerHTML = `
+          <img class="item-icon" src="${spell.image}" alt="${spell.name} icon" />
+          <div>
+            <div class="name">${spell.name}</div>
+            <div class="meta">Level ${spell.unlockLevel} unlock • ${format(spell.basePower)} base power</div>
+            <div class="meta">Cost: ${format(spellCost(key))} mana</div>
+          </div>
+          <button type="button" ${unlocked ? "" : "disabled"}>${unlocked ? "Assign" : "Locked"}</button>
+        `;
+        row.querySelector("button").addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          if (!unlocked) return;
+          assignSpellToSlot(activeSpellSlotPicker, key);
+          closeSpellSlotModal();
+        });
+        els.spellSlotModalBody.appendChild(row);
+      }
+    }
+
+    function renderAchievements() {
+      els.achievements.innerHTML = "";
+      for (const achievement of achievementData) {
+        const unlocked = state.achievements[achievement.key];
+        const card = document.createElement("div");
+        card.className = "item";
+        card.innerHTML = `
+          <img class="item-icon" src="${achievement.image}" alt="${achievement.name} icon" title="${achievement.tooltip}" />
+          <div>
+            <div class="name">${achievement.name} ${unlocked ? '<span class="pill">Unlocked</span>' : ""}</div>
+            <div class="meta">How to unlock: ${achievement.requirement}</div>
+            <div class="meta">Reward: ${achievement.reward}</div>
+          </div>
+          <button disabled>${unlocked ? "Unlocked" : "Locked"}</button>
+        `;
+        els.achievements.appendChild(card);
+      }
+    }
+
+    function renderLog() {
+      els.log.innerHTML = state.log
+        .map((entry) => `<div class="${entry.klass || ""}">${entry.text}</div>`)
+        .join("");
+    }
+
+    function tdPathPosition(progressRatio) {
+      const points = [
+        { x: 11, y: 14 },
+        { x: 45, y: 14 },
+        { x: 45, y: 50 },
+        { x: 84, y: 50 },
+        { x: 84, y: 77 }
+      ];
+      const clamped = Math.max(0, Math.min(1, progressRatio));
+      const segmentCount = points.length - 1;
+      const segmentFloat = clamped * segmentCount;
+      const segmentIndex = Math.min(segmentCount - 1, Math.floor(segmentFloat));
+      const t = segmentFloat - segmentIndex;
+      const from = points[segmentIndex];
+      const to = points[segmentIndex + 1];
+      return {
+        x: from.x + ((to.x - from.x) * t),
+        y: from.y + ((to.y - from.y) * t)
+      };
+    }
+
+    function renderTowerDefense() {
+      if (window.__RUST_TD_ACTIVE) return;
+      const td = state.towerDefense;
+      const hpPct = Math.max(0, Math.min(100, (td.enemyHp / Math.max(1, td.enemyMaxHp)) * 100));
+      const progressPct = Math.max(0, Math.min(100, td.enemyProgress * 100));
+      const rewardPower = td.enemyMaxHp * 1.6;
+      const rewardMana = Math.max(1, td.wave * 1.15);
+      const requiredPower = tdRequiredPower(td.wave);
+      const powerRatio = tdPowerRatio();
+      const towerPowerLow = powerRatio < 1;
+      const enemyPos = tdPathPosition(td.enemyProgress);
+      els.tdWave.textContent = String(td.wave);
+      els.tdBreaches.textContent = String(td.breaches);
+      els.tdDistance.textContent = `Distance to gate: ${(100 - progressPct).toFixed(0)}% • HP ${(hpPct).toFixed(0)}%`;
+      els.tdEnemyHealthFill.style.width = `${hpPct.toFixed(2)}%`;
+      const tdRenderData = tdRenderer.render({
+        enemyProgress: td.enemyProgress,
+        enemyPosition: enemyPos,
+        towers: tdAllTowerPositions(),
+        lowPower: towerPowerLow,
+        freezeSec: td.spellFreezeSec,
+        damageNumbers: td.damageNumbers,
+        shots: td.visualShots.map((shot) => {
+          const progress = Math.min(1, shot.age / Math.max(0.001, shot.life));
+          return {
+            pos: {
+              x: shot.from.x + ((shot.to.x - shot.from.x) * progress),
+              y: shot.from.y + ((shot.to.y - shot.from.y) * progress),
+            },
+            progress,
+          };
+        }),
+      });
+      const enemyHudAnchor = tdRenderData?.enemyHudAnchor;
+      if (enemyHudAnchor) {
+        const clampedX = Math.max(0.02, Math.min(0.98, enemyHudAnchor.x));
+        const clampedY = Math.max(0.03, Math.min(0.97, enemyHudAnchor.y));
+        els.tdEnemyUnit.style.left = `${(clampedX * 100).toFixed(2)}%`;
+        els.tdEnemyUnit.style.top = `${(clampedY * 100).toFixed(2)}%`;
+        els.tdEnemyUnit.style.opacity = "1";
+      } else {
+        els.tdEnemyUnit.style.left = `${enemyPos.x.toFixed(2)}%`;
+        els.tdEnemyUnit.style.top = `${enemyPos.y.toFixed(2)}%`;
+        els.tdEnemyUnit.style.opacity = tdRenderer.available ? "0" : "1";
+      }
+      const projectedDamageAnchors = tdRenderData?.damageAnchors || [];
+      els.tdDamageLayer.innerHTML = td.damageNumbers.map((num, idx) => {
+        const alpha = Math.max(0, 1 - (num.age / Math.max(0.001, num.life)));
+        const projected = projectedDamageAnchors[idx];
+        const x = projected?.x ?? (num.x / 100);
+        const y = projected?.y ?? (num.y / 100);
+        const clampedX = Math.max(0.02, Math.min(0.98, x));
+        const clampedY = Math.max(0.02, Math.min(0.98, y));
+        return `<span class="td-damage" style="left:${(clampedX * 100).toFixed(2)}%;top:${(clampedY * 100).toFixed(2)}%;opacity:${alpha.toFixed(2)}">-${format(num.value)}</span>`;
+      }).join("");
+      if (towerPowerLow) {
+        const pct = Math.max(0, Math.min(100, powerRatio * 100));
+        els.tdPowerWarning.textContent = `Tower power low (${pct.toFixed(0)}% of needed). Breach chance increased.`;
+      } else {
+        els.tdPowerWarning.textContent = `Tower power stable (${format(tdTowerDps())} / ${format(requiredPower)} recommended).`;
+      }
+      if (td.breaches >= tdMaxBreaches) {
+        els.tdEnemyInfo.textContent = "The barrier is overloaded (5 breaches). Keep casting and growing power, then refresh to restart this lane.";
+      } else {
+        els.tdEnemyInfo.textContent = `Wave ${td.wave} invader • ${format(td.enemyHp)} / ${format(td.enemyMaxHp)} HP • ${(progressPct).toFixed(0)}% to breach${td.spellFreezeSec > 0 ? ` • Frozen ${td.spellFreezeSec.toFixed(1)}s` : ""}`;
+      }
+      els.tdDps.textContent = `${format(tdTowerDps())} damage/sec`;
+      els.tdSpellBonus.textContent = `x${(1 + Math.min(2.5, td.spellPressure * 0.2)).toFixed(2)}`;
+      els.tdReward.textContent = `${format(rewardPower)} power / ${format(rewardMana)} mana`;
+    }
+
+    function render() {
+      const mps = getMps();
+      els.power.textContent = format(state.power);
+      els.totalPower.textContent = format(state.totalPower);
+      els.mps.textContent = format(mps);
+      const rankData = getArcaneRank(state.totalPower);
+      els.rank.textContent = `${rankData.name} (+${Math.round((rankData.buffs.mpsMult - 1) * 100)}% mps / +${Math.round((rankData.buffs.spellPowerMult - 1) * 100)}% spell / -${Math.round((1 - rankData.buffs.manaCostMult) * 100)}% mana cost)`;
+      els.equipmentLevelingToggle.checked = state.equipmentLevelingEnabled;
+      const progress = levelProgress(state.playerLevel, state.levelProgressPower);
+      state.levelBonus = (state.playerLevel - 1) * 0.05;
+      els.playerLevel.textContent = `Level ${state.playerLevel}`;
+      els.levelProfitBonus.textContent = `+${(state.levelBonus * 100).toFixed(0)}% profit`;
+      els.levelProgressFill.style.width = `${(progress.pct * 100).toFixed(2)}%`;
+      els.levelProgressText.textContent = `${format(progress.current)} / ${format(progress.needed)} power to next level`;
+      const activeSpellKey = selectedSpellKey();
+      const activeSpell = activeSpellKey ? spellData[activeSpellKey] : null;
+      els.manaMirror.textContent = format(state.mana);
+      els.clickGain.textContent = `(+${format(Math.max(1, state.clickPower))} power)`;
+      els.activeSpellName.textContent = activeSpell ? activeSpell.name : "No Spell Selected";
+      if (activeSpell) {
+        els.spellPower.textContent = `+${format(spellPower(activeSpellKey))} power/sec`;
+        const remainMs = activeSpellRemainingMs(activeSpellKey);
+        els.spellTime.textContent = remainMs > 0 ? `${(remainMs / 1000).toFixed(1)}s remaining` : `${activeSpell.durationSec.toFixed(0)}s duration`;
+      } else {
+        els.spellPower.textContent = "assign from quickslot";
+        els.spellTime.textContent = "ready";
+      }
+
+      for (const btn of els.buyToggle.querySelectorAll("button")) {
+        btn.classList.toggle("active", Number(btn.dataset.buy) === state.buyAmount);
+      }
+
+      renderStructures();
+      renderEquipment();
+      renderPets();
+      renderUpgrades();
+      renderQuickslots();
+      renderTowerDefense();
+      renderAchievements();
+      renderLog();
+    }
+
+    function gameLoop() {
+      const now = Date.now();
+      const delta = Math.min((now - state.lastTick) / 1000, 1);
+      state.lastTick = now;
+      const baseGain = getMps() * delta;
+      const spellGain = getActiveSpellPps(now) * delta;
+      const gain = baseGain + spellGain;
+      state.towerDefense.spellPressure = Math.max(0, state.towerDefense.spellPressure - (delta * 0.075));
+      updateTowerDefense(delta);
+      if (gain > 0) {
+        state.power += gain;
+        state.totalPower += gain;
+        state.levelProgressPower += gain;
+        state.mana += baseGain * 0.25 * getPetModifiers().manaGain;
+        grantPetXp((baseGain * 0.0025) + (spellGain * 0.005));
+      }
+      applyLevelUps();
+
+      autoUnlockAchievements();
+      render();
+    }
+
+
+    els.equipmentLevelingToggle.addEventListener("change", () => {
+      state.equipmentLevelingEnabled = Boolean(els.equipmentLevelingToggle.checked);
+      addLog(`Equipment leveling ${state.equipmentLevelingEnabled ? "enabled" : "disabled"}.`, "warn");
+      renderGearModal();
+      render();
+    });
+
+    els.clickBtn.addEventListener("click", gatherPower);
+    els.saveBtn.addEventListener("click", () => saveGame(true));
+    els.showAllUpgradesBtn.addEventListener("click", openUpgradeListModal);
+    els.closeUpgradeListBtn.addEventListener("click", closeUpgradeListModal);
+    els.closeGearModalBtn.addEventListener("click", closeGearModal);
+    els.closeSpellSlotModalBtn.addEventListener("click", closeSpellSlotModal);
+    els.upgradeListModal.addEventListener("click", (event) => {
+      if (event.target === els.upgradeListModal) closeUpgradeListModal();
+    });
+    els.gearModal.addEventListener("click", (event) => {
+      if (event.target === els.gearModal) closeGearModal();
+    });
+    els.spellSlotModal.addEventListener("click", (event) => {
+      if (event.target === els.spellSlotModal) closeSpellSlotModal();
+    });
+    els.resetBtn.addEventListener("click", () => {
+      if (confirm("Reset all progress?")) resetGame();
+    });
+    els.buyToggle.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLButtonElement)) return;
+      const amount = Number(target.dataset.buy);
+      if (![1, 10, 25].includes(amount)) return;
+      state.buyAmount = amount;
+      render();
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !els.upgradeListModal.classList.contains("hidden")) {
+        closeUpgradeListModal();
+        return;
+      }
+
+      if (event.key === "Escape" && !els.gearModal.classList.contains("hidden")) {
+        closeGearModal();
+        return;
+      }
+
+      if (event.code === "Space") {
+        event.preventDefault();
+        castSpell();
+        return;
+      }
+
+      if (event.code.startsWith("Digit")) {
+        const slotNumber = Number(event.code.slice(5));
+        if (slotNumber >= 1 && slotNumber <= spellQuickslotCount) {
+          event.preventDefault();
+          state.activeQuickslot = slotNumber - 1;
+          castSpell(state.quickslots[slotNumber - 1]);
+          render();
+        }
+      }
+    });
+
+    loadGame();
+    render();
+    setInterval(gameLoop, 100);
+    setInterval(() => saveGame(false), AUTO_SAVE_MS);
+  </script>
+  </body>
 </html>

@@ -1,12 +1,7 @@
-# Arcane Tower Defense (WebGPU + WebAssembly)
+# Arcane Idle + Rust Tower Defense
 
-This project was migrated from a JavaScript-only prototype to a **Rust + WebAssembly simulation** with a **WebGPU renderer**.
-
-## Tech split
-
-- `rust/td_wasm`: core tower-defense simulation (waves, enemies, towers, combat, economy)
-- `js/webgpuRenderer.js`: WebGPU pipeline and draw loop
-- `js/main.js`: boots the WASM module, forwards input, updates HUD
+The original Arcane Idle game UI and systems remain in place.
+Only the tower-defense lane is now driven by the Rust/WebAssembly engine and rendered via WebGPU.
 
 ## Build WASM package
 
