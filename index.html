@@ -1476,6 +1476,7 @@
         spellPressure: 0,
         spellFreezeSec: 0,
         shotCooldown: 0,
+        placedTowers: [],
         visualShots: [],
         damageNumbers: [],
       },
@@ -1843,21 +1844,28 @@
           drawTriangles(segmentPrism(progressPath[i], progressPath[i + 1], 0.12, 0.08), [0.98, 0.9, 0.7, 0.95], camera);
         }
 
-        const tower = pctToWorld({ x: 84, y: 77 });
-        drawTriangles(boxVertices([tower.x, -0.07, tower.z], [0.34, 0.18, 0.34]), [0.33, 0.28, 0.68, 1], camera);
-        drawTriangles(boxVertices([tower.x, 0.11, tower.z], [0.24, 0.38, 0.24]), [0.43, 0.32, 0.82, 1], camera);
-        drawTriangles(boxVertices([tower.x, 0.34, tower.z], [0.29, 0.12, 0.29]), [0.54, 0.44, 0.9, 1], camera);
-        drawTriangles(boxVertices([tower.x + 0.11, 0.41, tower.z + 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
-        drawTriangles(boxVertices([tower.x - 0.11, 0.41, tower.z + 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
-        drawTriangles(boxVertices([tower.x + 0.11, 0.41, tower.z - 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
-        drawTriangles(boxVertices([tower.x - 0.11, 0.41, tower.z - 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
-        drawTriangles(sphereVertices([tower.x, 0.48, tower.z], 0.085, 10, 8), [0.55, 0.71, 1, 0.95], camera);
+        const towers = Array.isArray(scene.towers) && scene.towers.length ? scene.towers : [{ x: 84, y: 77 }];
+        for (const towerPct of towers) {
+          const tower = pctToWorld(towerPct);
+          drawTriangles(boxVertices([tower.x, -0.07, tower.z], [0.34, 0.18, 0.34]), [0.33, 0.28, 0.68, 1], camera);
+          drawTriangles(boxVertices([tower.x, 0.11, tower.z], [0.24, 0.38, 0.24]), [0.43, 0.32, 0.82, 1], camera);
+          drawTriangles(boxVertices([tower.x, 0.34, tower.z], [0.29, 0.12, 0.29]), [0.54, 0.44, 0.9, 1], camera);
+          drawTriangles(boxVertices([tower.x + 0.11, 0.41, tower.z + 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
+          drawTriangles(boxVertices([tower.x - 0.11, 0.41, tower.z + 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
+          drawTriangles(boxVertices([tower.x + 0.11, 0.41, tower.z - 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
+          drawTriangles(boxVertices([tower.x - 0.11, 0.41, tower.z - 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
+          drawTriangles(sphereVertices([tower.x, 0.48, tower.z], 0.085, 10, 8), [0.55, 0.71, 1, 0.95], camera);
+        }
 
         const enemy = pctToWorld(scene.enemyPosition);
         drawTriangles(sphereVertices([enemy.x, 0.01, enemy.z], 0.1, 14, 10), [0.95, 0.31, 0.25, 1], camera);
         drawTriangles(sphereVertices([enemy.x, 0.13, enemy.z], 0.06, 12, 8), [1, 0.47, 0.36, 1], camera);
         drawTriangles(boxVertices([enemy.x - 0.045, -0.09, enemy.z], [0.04, 0.1, 0.04]), [0.73, 0.2, 0.17, 1], camera);
         drawTriangles(boxVertices([enemy.x + 0.045, -0.09, enemy.z], [0.04, 0.1, 0.04]), [0.73, 0.2, 0.17, 1], camera);
+        drawTriangles(boxVertices([enemy.x, 0.19, enemy.z], [0.11, 0.035, 0.08]), [0.72, 0.74, 0.8, 1], camera);
+        drawTriangles(boxVertices([enemy.x, 0.23, enemy.z], [0.06, 0.05, 0.06]), [0.66, 0.68, 0.74, 1], camera);
+        drawTriangles(sphereVertices([enemy.x - 0.11, 0.2, enemy.z], 0.03, 8, 6), [0.9, 0.86, 0.64, 1], camera);
+        drawTriangles(sphereVertices([enemy.x + 0.11, 0.2, enemy.z], 0.03, 8, 6), [0.9, 0.86, 0.64, 1], camera);
 
         if (scene.freezeSec > 0) {
           drawTriangles(sphereVertices([enemy.x, -0.03, enemy.z], 0.15, 10, 8), [0.55, 0.82, 1, 0.3], camera);
@@ -1884,6 +1892,26 @@
 
 
     const tdRenderer = createTowerDefenseWebGLRenderer(els.tdWebglCanvas);
+
+    els.tdWebglCanvas.addEventListener("click", (event) => {
+      if (event.button !== 0) return;
+      const rect = els.tdWebglCanvas.getBoundingClientRect();
+      if (rect.width <= 0 || rect.height <= 0) return;
+      const x = ((event.clientX - rect.left) / rect.width) * 100;
+      const y = ((event.clientY - rect.top) / rect.height) * 100;
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      if (state.towerDefense.placedTowers.length >= 12) {
+        addLog("Tower lane full. Remove pressure before placing more towers.", "warn");
+        return;
+      }
+      const placed = {
+        x: Math.max(8, Math.min(93, x)),
+        y: Math.max(8, Math.min(90, y)),
+      };
+      state.towerDefense.placedTowers.push(placed);
+      addLog(`Placed support tower at (${placed.x.toFixed(0)}%, ${placed.y.toFixed(0)}%).`, "ok");
+      render();
+    });
 
     function format(num) {
       if (num < 1000) return num.toFixed(1).replace(/\.0$/, "");
@@ -2173,7 +2201,8 @@
       const totalPowerScale = Math.pow(Math.max(1, state.totalPower), 0.22);
       const structureScale = 1 + (Object.values(state.structures).reduce((sum, amount) => sum + amount, 0) * 0.02);
       const spellScale = 1 + Math.min(2.5, state.towerDefense.spellPressure * 0.2);
-      return totalPowerScale * structureScale * spellScale;
+      const placedTowerScale = 1 + (Math.max(0, state.towerDefense.placedTowers.length) * 0.22);
+      return totalPowerScale * structureScale * spellScale * placedTowerScale;
     }
 
     function tdWaveValue(wave = state.towerDefense.wave) {
@@ -2213,6 +2242,10 @@
       return { x: 90, y: 81 };
     }
 
+    function tdAllTowerPositions() {
+      return [tdTowerPosition(), ...(state.towerDefense.placedTowers || [])];
+    }
+
     function addTdDamageNumber(value, position) {
       if (value <= 0) return;
       state.towerDefense.damageNumbers.push({
@@ -2230,7 +2263,8 @@
 
     function spawnTowerShot(damage) {
       const enemyPos = tdPathPosition(state.towerDefense.enemyProgress);
-      const from = tdTowerPosition();
+      const towers = tdAllTowerPositions();
+      const from = towers[Math.floor(Math.random() * towers.length)] || tdTowerPosition();
       state.towerDefense.visualShots.push({
         from,
         to: enemyPos,
@@ -2560,6 +2594,15 @@
       }
       state.levelBonus = Number.isFinite(data.levelBonus) ? Number(data.levelBonus) : (state.playerLevel - 1) * 0.05;
       const loadedTd = data.towerDefense || {};
+      const loadedPlacedTowers = Array.isArray(loadedTd.placedTowers)
+        ? loadedTd.placedTowers
+          .map((tower) => ({
+            x: Math.max(8, Math.min(93, Number(tower?.x))),
+            y: Math.max(8, Math.min(90, Number(tower?.y))),
+          }))
+          .filter((tower) => Number.isFinite(tower.x) && Number.isFinite(tower.y))
+          .slice(0, 12)
+        : [];
       state.towerDefense = {
         wave: Math.max(1, Math.floor(Number(loadedTd.wave || 1))),
         breaches: Math.max(0, Math.floor(Number(loadedTd.breaches || 0))),
@@ -2569,6 +2612,7 @@
         spellPressure: Math.max(0, Number(loadedTd.spellPressure || 0)),
         spellFreezeSec: Math.max(0, Number(loadedTd.spellFreezeSec || 0)),
         shotCooldown: 0,
+        placedTowers: loadedPlacedTowers,
         visualShots: [],
         damageNumbers: [],
       };
@@ -3059,6 +3103,7 @@
       const tdRenderData = tdRenderer.render({
         enemyProgress: td.enemyProgress,
         enemyPosition: enemyPos,
+        towers: tdAllTowerPositions(),
         lowPower: towerPowerLow,
         freezeSec: td.spellFreezeSec,
         damageNumbers: td.damageNumbers,
