@@ -499,6 +499,48 @@
       box-shadow: 0 0 0 2px rgba(159, 67, 255, 0.65) inset;
     }
 
+    .equipment-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .gear-slot {
+      border: 1px solid rgba(255, 202, 125, 0.5);
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(28, 17, 10, 0.95), rgba(12, 9, 8, 0.95));
+      color: var(--text);
+      padding: 10px;
+      display: grid;
+      gap: 4px;
+      text-align: left;
+      min-height: 98px;
+      align-content: start;
+    }
+
+    .gear-slot.empty {
+      border-style: dashed;
+      border-color: rgba(255, 202, 125, 0.35);
+      color: var(--muted);
+    }
+
+    .gear-slot .slot-type {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .gear-slot .slot-item {
+      font-size: 0.95rem;
+      font-weight: 700;
+    }
+
+    .gear-slot .slot-profit {
+      font-size: 0.78rem;
+      color: #9fddff;
+    }
+
     .spell-card {
       display: grid;
       gap: 8px;
@@ -545,6 +587,7 @@
     @media (max-width: 900px) {
       .game { grid-template-columns: 1fr; }
       .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .equipment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
   </style>
 </head>
@@ -598,6 +641,13 @@
       <div id="structures" class="shop scroll-shop"></div>
     </section>
 
+    <section class="panel">
+      <h2>🛡️ Equipment</h2>
+      <div class="meta">Equip gear to boost structure profits. Click a slot to browse and buy items with power.</div>
+      <div id="equipmentBonus" class="meta"></div>
+      <div id="equipmentSlots" class="equipment-grid"></div>
+    </section>
+
 
     <section class="panel">
       <h2>🏆 Achievements</h2>
@@ -617,6 +667,16 @@
         <button id="closeUpgradeListBtn" class="btn-ghost" type="button">Close</button>
       </div>
       <div id="upgradeListBody" class="upgrade-modal-list"></div>
+    </div>
+  </div>
+
+  <div id="gearModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="gearModalTitle">
+    <div class="upgrade-modal panel">
+      <div class="upgrade-modal-header">
+        <h3 id="gearModalTitle">Slot Gear</h3>
+        <button id="closeGearModalBtn" class="btn-ghost" type="button">Close</button>
+      </div>
+      <div id="gearModalBody" class="upgrade-modal-list"></div>
     </div>
   </div>
 
@@ -850,6 +910,60 @@
       { key: "voidCaller", name: "Void Caller", image: webIcon("🌌"), test: (s) => s.structures.voidReactor >= 2, requirement: "Own 2 Void Reactors.", reward: "+40 click power", tooltip: "A deep-end milestone that empowers manual burst play in the late game." },
     ];
 
+    const gearSlotData = {
+      weapon: { name: "Weapon", icon: "⚔️" },
+      helm: { name: "Helm", icon: "🪖" },
+      chest: { name: "Chest", icon: "🛡️" },
+      gloves: { name: "Gloves", icon: "🧤" },
+      ring: { name: "Ring", icon: "💍" },
+      trinket: { name: "Trinket", icon: "🧿" },
+    };
+
+    const gearData = {
+      weapon: [
+        { id: "oak-wand", name: "Oak Initiate Wand", cost: 220, profitBonus: 0.03 },
+        { id: "ember-rod", name: "Emberglass Rod", cost: 900, profitBonus: 0.06 },
+        { id: "storm-staff", name: "Stormcaller Staff", cost: 3600, profitBonus: 0.1 },
+        { id: "rift-blade", name: "Rift Channeler Blade", cost: 22000, profitBonus: 0.15 },
+        { id: "astral-pike", name: "Astral Pike of Profit", cost: 105000, profitBonus: 0.22 },
+      ],
+      helm: [
+        { id: "linen-cowl", name: "Linen Cowl", cost: 180, profitBonus: 0.025 },
+        { id: "seer-hood", name: "Seer's Hood", cost: 780, profitBonus: 0.055 },
+        { id: "wyrm-circlet", name: "Wyrmfire Circlet", cost: 3200, profitBonus: 0.09 },
+        { id: "runic-crown", name: "Runic Crown", cost: 18000, profitBonus: 0.14 },
+        { id: "crown-archmage", name: "Crown of the Archmage", cost: 98000, profitBonus: 0.21 },
+      ],
+      chest: [
+        { id: "apprentice-robes", name: "Apprentice Robes", cost: 250, profitBonus: 0.035 },
+        { id: "weave-coat", name: "Arcweave Coat", cost: 1200, profitBonus: 0.07 },
+        { id: "plate-aether", name: "Aetherplate Vest", cost: 5400, profitBonus: 0.11 },
+        { id: "void-mail", name: "Voidbound Mail", cost: 26000, profitBonus: 0.17 },
+        { id: "mantle-cosmos", name: "Mantle of Cosmos", cost: 130000, profitBonus: 0.25 },
+      ],
+      gloves: [
+        { id: "scribe-wraps", name: "Scribe Wraps", cost: 130, profitBonus: 0.02 },
+        { id: "silk-grips", name: "Silk Grips", cost: 620, profitBonus: 0.05 },
+        { id: "golem-gauntlets", name: "Golem Gauntlets", cost: 2800, profitBonus: 0.085 },
+        { id: "fate-grasps", name: "Fategrasps", cost: 16000, profitBonus: 0.13 },
+        { id: "starhands", name: "Starhands", cost: 86000, profitBonus: 0.2 },
+      ],
+      ring: [
+        { id: "copper-band", name: "Copper Band", cost: 90, profitBonus: 0.015 },
+        { id: "moon-band", name: "Moon Band", cost: 500, profitBonus: 0.045 },
+        { id: "sigil-loop", name: "Sigil Loop", cost: 2400, profitBonus: 0.08 },
+        { id: "nexus-ring", name: "Nexus Ring", cost: 13000, profitBonus: 0.125 },
+        { id: "eternity-loop", name: "Eternity Loop", cost: 74000, profitBonus: 0.19 },
+      ],
+      trinket: [
+        { id: "apprentice-charm", name: "Apprentice Charm", cost: 140, profitBonus: 0.025 },
+        { id: "fortune-orb", name: "Fortune Orb", cost: 680, profitBonus: 0.055 },
+        { id: "echo-relic", name: "Echo Relic", cost: 3100, profitBonus: 0.095 },
+        { id: "horizon-idol", name: "Horizon Idol", cost: 17500, profitBonus: 0.145 },
+        { id: "oracle-heart", name: "Oracle Heart", cost: 92000, profitBonus: 0.215 },
+      ],
+    };
+
     const state = {
       power: 0,
       mana: 0,
@@ -859,6 +973,8 @@
       activeSpell: "bolt",
       spellCasts: 0,
       structures: Object.fromEntries(Object.keys(structureData).map((k) => [k, 0])),
+      equipment: Object.fromEntries(Object.keys(gearSlotData).map((k) => [k, null])),
+      ownedGear: {},
       upgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, 0])),
       revealedUpgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, false])),
       achievements: Object.fromEntries(achievementData.map((a) => [a.key, false])),
@@ -883,16 +999,23 @@
       resetBtn: document.getElementById("resetBtn"),
       buyToggle: document.getElementById("buyToggle"),
       structures: document.getElementById("structures"),
+      equipmentSlots: document.getElementById("equipmentSlots"),
+      equipmentBonus: document.getElementById("equipmentBonus"),
       upgrades: document.getElementById("upgrades"),
       showAllUpgradesBtn: document.getElementById("showAllUpgradesBtn"),
       upgradeListModal: document.getElementById("upgradeListModal"),
       closeUpgradeListBtn: document.getElementById("closeUpgradeListBtn"),
       upgradeListBody: document.getElementById("upgradeListBody"),
+      gearModal: document.getElementById("gearModal"),
+      gearModalTitle: document.getElementById("gearModalTitle"),
+      gearModalBody: document.getElementById("gearModalBody"),
+      closeGearModalBtn: document.getElementById("closeGearModalBtn"),
       achievements: document.getElementById("achievements"),
       log: document.getElementById("log"),
     };
 
     let previousUpgradeRenderKey = "";
+    let activeGearSlot = null;
 
     function format(num) {
       if (num < 1000) return num.toFixed(1).replace(/\.0$/, "");
@@ -992,7 +1115,21 @@
         total += amount * structureData[key].mps * getStructureSpecificMultiplier(key);
       }
       const infusionBonus = 1 + (upgradeLevel("manaInfusion") * 0.06);
-      return total * productionMultiplier() * infusionBonus;
+      return total * productionMultiplier() * infusionBonus * gearProfitMultiplier();
+    }
+
+    function findGear(slot, gearId) {
+      return (gearData[slot] || []).find((gear) => gear.id === gearId) || null;
+    }
+
+    function gearProfitMultiplier() {
+      let bonus = 0;
+      for (const [slot, gearId] of Object.entries(state.equipment)) {
+        const gear = findGear(slot, gearId);
+        if (!gear) continue;
+        bonus += gear.profitBonus;
+      }
+      return 1 + bonus;
     }
 
 
@@ -1055,6 +1192,24 @@
       } else {
         addLog(`Learned upgrade: ${up.name}. ${up.effect}`, "ok");
       }
+      render();
+    }
+
+    function buyGear(slot, gearId) {
+      const gear = findGear(slot, gearId);
+      if (!gear) return;
+      const alreadyOwned = Boolean(state.ownedGear[gearId]);
+      if (!alreadyOwned && !canAfford(gear.cost)) return;
+
+      if (!alreadyOwned) {
+        state.power -= gear.cost;
+        state.ownedGear[gearId] = true;
+        addLog(`Purchased ${gear.name} for ${format(gear.cost)} power.`, "ok");
+      }
+
+      state.equipment[slot] = gearId;
+      addLog(`Equipped ${gear.name} in ${gearSlotData[slot].name}.`, "warn");
+      renderGearModal();
       render();
     }
 
@@ -1144,6 +1299,20 @@
       for (const key of Object.keys(state.structures)) {
         state.structures[key] = Number(data.structures?.[key] || 0);
       }
+      for (const key of Object.keys(state.equipment)) {
+        const gearId = data.equipment?.[key] || null;
+        state.equipment[key] = findGear(key, gearId) ? gearId : null;
+      }
+      state.ownedGear = {};
+      const loadedOwnedGear = data.ownedGear || {};
+      for (const slotItems of Object.values(gearData)) {
+        for (const gear of slotItems) {
+          if (loadedOwnedGear[gear.id]) state.ownedGear[gear.id] = true;
+        }
+      }
+      for (const equippedId of Object.values(state.equipment)) {
+        if (equippedId) state.ownedGear[equippedId] = true;
+      }
       for (const key of Object.keys(state.upgrades)) {
         const loaded = data.upgrades?.[key];
         state.upgrades[key] = loaded === true ? 1 : Number(loaded || 0);
@@ -1222,6 +1391,31 @@
           buyStructure(key);
         });
         els.structures.appendChild(card);
+      }
+    }
+
+    function renderEquipment() {
+      els.equipmentSlots.innerHTML = "";
+      const totalBonusPct = (gearProfitMultiplier() - 1) * 100;
+      els.equipmentBonus.textContent = `Current gear bonus: +${totalBonusPct.toFixed(1)}% structure profits`;
+
+      for (const [slot, slotMeta] of Object.entries(gearSlotData)) {
+        const gearId = state.equipment[slot];
+        const gear = findGear(slot, gearId);
+
+        const slotButton = document.createElement("button");
+        slotButton.type = "button";
+        slotButton.className = `gear-slot ${gear ? "" : "empty"}`;
+        slotButton.innerHTML = `
+          <div class="slot-type">${slotMeta.icon} ${slotMeta.name}</div>
+          <div class="slot-item">${gear ? gear.name : "Empty Slot"}</div>
+          <div class="slot-profit">${gear ? `+${(gear.profitBonus * 100).toFixed(1)}% profit` : "Click to browse gear"}</div>
+        `;
+        slotButton.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          openGearModal(slot);
+        });
+        els.equipmentSlots.appendChild(slotButton);
       }
     }
 
@@ -1324,6 +1518,51 @@
       }
     }
 
+    function openGearModal(slot) {
+      activeGearSlot = slot;
+      renderGearModal();
+      els.gearModal.classList.remove("hidden");
+    }
+
+    function closeGearModal() {
+      activeGearSlot = null;
+      els.gearModal.classList.add("hidden");
+    }
+
+    function renderGearModal() {
+      if (!activeGearSlot || !gearSlotData[activeGearSlot]) return;
+      const slotMeta = gearSlotData[activeGearSlot];
+      els.gearModalTitle.textContent = `${slotMeta.icon} ${slotMeta.name} Gear`;
+      els.gearModalBody.innerHTML = "";
+
+      const equippedId = state.equipment[activeGearSlot];
+      for (const gear of gearData[activeGearSlot]) {
+        const owned = Boolean(state.ownedGear[gear.id]);
+        const equipped = equippedId === gear.id;
+        const affordable = canAfford(gear.cost);
+        const disabled = !owned && !affordable;
+
+        const row = document.createElement("div");
+        row.className = "upgrade-modal-item";
+        row.innerHTML = `
+          <img class="item-icon" src="${webIcon("🧰")}" alt="gear icon" />
+          <div>
+            <div class="name">${gear.name} ${equipped ? '<span class="pill">Equipped</span>' : ""} ${owned && !equipped ? '<span class="pill">Owned</span>' : ""}</div>
+            <div class="meta">Profit boost: +${(gear.profitBonus * 100).toFixed(1)}%</div>
+            <div class="meta">Cost: ${format(gear.cost)} power</div>
+          </div>
+          <button ${disabled || equipped ? "disabled" : ""}>${owned ? "Equip" : "Buy"}</button>
+        `;
+        row.querySelector("button").addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (disabled || equipped) return;
+          buyGear(activeGearSlot, gear.id);
+        });
+        els.gearModalBody.appendChild(row);
+      }
+    }
+
     function openUpgradeListModal() {
       renderUpgradeListModal();
       els.upgradeListModal.classList.remove("hidden");
@@ -1404,6 +1643,7 @@
       }
 
       renderStructures();
+      renderEquipment();
       renderUpgrades();
       renderQuickslots();
       renderAchievements();
@@ -1429,8 +1669,12 @@
     els.saveBtn.addEventListener("click", () => saveGame(true));
     els.showAllUpgradesBtn.addEventListener("click", openUpgradeListModal);
     els.closeUpgradeListBtn.addEventListener("click", closeUpgradeListModal);
+    els.closeGearModalBtn.addEventListener("click", closeGearModal);
     els.upgradeListModal.addEventListener("click", (event) => {
       if (event.target === els.upgradeListModal) closeUpgradeListModal();
+    });
+    els.gearModal.addEventListener("click", (event) => {
+      if (event.target === els.gearModal) closeGearModal();
     });
     els.resetBtn.addEventListener("click", () => {
       if (confirm("Reset all progress?")) resetGame();
@@ -1447,6 +1691,11 @@
     window.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && !els.upgradeListModal.classList.contains("hidden")) {
         closeUpgradeListModal();
+        return;
+      }
+
+      if (event.key === "Escape" && !els.gearModal.classList.contains("hidden")) {
+        closeGearModal();
         return;
       }
 
