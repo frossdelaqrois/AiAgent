@@ -977,7 +977,7 @@
     };
 
     function createGearSet(slotPrefix, names, icons, baseCost, baseBonus) {
-      const costGrowth = 1.85;
+      const costGrowth = 3.2;
       const bonusStep = 0.0125;
       return names.map((name, idx) => ({
         id: `${slotPrefix}-${idx + 1}`,
@@ -1047,6 +1047,7 @@
       ownedGear: {},
       gearLevels: {},
       equipmentLevelingEnabled: false,
+      levelProgressPower: 0,
       upgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, 0])),
       revealedUpgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, false])),
       achievements: Object.fromEntries(achievementData.map((a) => [a.key, false])),
@@ -1198,19 +1199,28 @@
       return mult;
     }
 
-    function playerLevelFromTotalPower(totalPower) {
-      const safePower = Math.max(0, totalPower);
-      return Math.max(1, Math.floor(Math.log10(safePower + 1) * 3) + 1);
+    function getLevelUpCost(level) {
+      const safeLevel = Math.max(1, Math.floor(level));
+      return Math.floor(120 * Math.pow(1.9, safeLevel - 1));
     }
 
-    function levelProgress(totalPower) {
-      const level = playerLevelFromTotalPower(totalPower);
-      const prevThreshold = level <= 1 ? 0 : ((10 ** ((level - 2) / 3)) - 1);
-      const nextThreshold = (10 ** ((level - 1) / 3)) - 1;
-      const span = Math.max(1, nextThreshold - prevThreshold);
-      const current = Math.max(0, totalPower - prevThreshold);
-      const pct = Math.max(0, Math.min(1, current / span));
-      return { level, prevThreshold, nextThreshold, pct };
+    function estimateLevelFromTotalPower(totalPower) {
+      let level = 1;
+      let progressPower = Math.max(0, totalPower);
+      while (level < 500) {
+        const cost = getLevelUpCost(level);
+        if (progressPower < cost) break;
+        progressPower -= cost;
+        level += 1;
+      }
+      return { level, progressPower };
+    }
+
+    function levelProgress(level, progressPower) {
+      const needed = getLevelUpCost(level);
+      const current = Math.max(0, progressPower);
+      const pct = Math.max(0, Math.min(1, current / needed));
+      return { needed, current, pct };
     }
 
     function getStructureSpecificMultiplier(structureKey) {
@@ -1259,8 +1269,21 @@
       const gear = Object.values(gearData).flat().find((entry) => entry.id === gearId);
       if (!gear) return Infinity;
       const level = gearLevel(gearId);
-      const base = Math.max(40, Math.floor(gear.cost * 0.7));
-      return Math.floor(base * Math.pow(1.9, level - 1));
+      const base = Math.max(1000, Math.floor(gear.cost * 1.2));
+      return Math.floor(base * Math.pow(2.75, level - 1));
+    }
+
+    function applyLevelUps() {
+      let gained = 0;
+      while (state.levelProgressPower >= getLevelUpCost(state.playerLevel) && state.playerLevel < 500) {
+        state.levelProgressPower -= getLevelUpCost(state.playerLevel);
+        state.playerLevel += 1;
+        gained += 1;
+      }
+      state.levelBonus = (state.playerLevel - 1) * 0.05;
+      if (gained > 0) {
+        addLog(`Level up! Reached level ${state.playerLevel}. Profit bonus is now +${(state.levelBonus * 100).toFixed(0)}%.`, "ok");
+      }
     }
 
     function upgradeGearLevel(gearId) {
@@ -1416,7 +1439,9 @@
       state.mana -= cost;
       state.power += power;
       state.totalPower += power;
+      state.levelProgressPower += power;
       state.spellCasts += 1;
+      applyLevelUps();
       if (state.spellCasts % 25 === 0) {
         addLog(`Arcane rhythm! ${state.spellCasts} spells cast so far.`, "warn");
       }
@@ -1478,7 +1503,15 @@
         state.achievements[key] = Boolean(data.achievements?.[key]);
       }
       const loadedLevel = Number(data.playerLevel || 0);
-      state.playerLevel = loadedLevel > 0 ? Math.floor(loadedLevel) : playerLevelFromTotalPower(state.totalPower);
+      const loadedProgress = Number(data.levelProgressPower);
+      if (loadedLevel > 0) {
+        state.playerLevel = Math.floor(loadedLevel);
+        state.levelProgressPower = Number.isFinite(loadedProgress) ? Math.max(0, loadedProgress) : 0;
+      } else {
+        const estimated = estimateLevelFromTotalPower(state.totalPower);
+        state.playerLevel = estimated.level;
+        state.levelProgressPower = estimated.progressPower;
+      }
       state.levelBonus = Number.isFinite(data.levelBonus) ? Number(data.levelBonus) : (state.playerLevel - 1) * 0.05;
 
       state.log = Array.isArray(data.log) && data.log.length
@@ -1495,7 +1528,9 @@
 
       state.power += gained;
       state.totalPower += gained;
+      state.levelProgressPower += gained;
       state.mana += gained * 0.25;
+      applyLevelUps();
       addLog(`You were away for ${Math.floor(elapsedSeconds)}s and gained ${format(gained)} power and ${format(gained * 0.25)} mana.`, "warn");
     }
 
@@ -1808,13 +1843,12 @@
       const rankData = getArcaneRank(state.totalPower);
       els.rank.textContent = `${rankData.name} (+${Math.round((rankData.buffs.mpsMult - 1) * 100)}% mps / +${Math.round((rankData.buffs.spellPowerMult - 1) * 100)}% spell / -${Math.round((1 - rankData.buffs.manaCostMult) * 100)}% mana cost)`;
       els.equipmentLevelingToggle.checked = state.equipmentLevelingEnabled;
-      const progress = levelProgress(state.totalPower);
-      state.playerLevel = progress.level;
+      const progress = levelProgress(state.playerLevel, state.levelProgressPower);
       state.levelBonus = (state.playerLevel - 1) * 0.05;
       els.playerLevel.textContent = `Level ${state.playerLevel}`;
       els.levelProfitBonus.textContent = `+${(state.levelBonus * 100).toFixed(0)}% profit`;
       els.levelProgressFill.style.width = `${(progress.pct * 100).toFixed(2)}%`;
-      els.levelProgressText.textContent = `${format(state.totalPower - progress.prevThreshold)} / ${format(progress.nextThreshold - progress.prevThreshold)} power to next level`;
+      els.levelProgressText.textContent = `${format(progress.current)} / ${format(progress.needed)} power to next level`;
       const activeSpell = spellData[state.activeSpell] || spellData.bolt;
       els.powerMirror.textContent = format(state.power);
       els.manaMirror.textContent = format(state.mana);
@@ -1837,20 +1871,14 @@
       const now = Date.now();
       const delta = Math.min((now - state.lastTick) / 1000, 1);
       state.lastTick = now;
-      const oldLevel = Math.max(1, state.playerLevel || 1);
       const gain = getMps() * delta;
       if (gain > 0) {
         state.power += gain;
         state.totalPower += gain;
+        state.levelProgressPower += gain;
         state.mana += gain * 0.25;
       }
-
-      const newLevel = playerLevelFromTotalPower(state.totalPower);
-      if (newLevel > oldLevel) {
-        state.playerLevel = newLevel;
-        state.levelBonus = (newLevel - 1) * 0.05;
-        addLog(`Level up! Reached level ${newLevel}. Profit bonus is now +${(state.levelBonus * 100).toFixed(0)}%.`, "ok");
-      }
+      applyLevelUps();
 
       autoUnlockAchievements();
       render();
