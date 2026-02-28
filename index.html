@@ -715,10 +715,21 @@
     .td-decor.t3 { right: 20%; top: 24%; }
     .td-decor.t4 { left: 66%; top: 73%; }
 
-    .td-shots,
+    .td-webgl-canvas,
     .td-damage-layer {
       position: absolute;
       inset: 0;
+    }
+
+    .td-webgl-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .td-damage-layer {
       pointer-events: none;
       z-index: 4;
     }
@@ -939,22 +950,8 @@
         <div class="td-lane">
           <div class="tiny">Wave <b id="tdWave">1</b> • Breaches <b id="tdBreaches">0</b> / 5</div>
           <div class="td-battlefield">
-            <span id="tdPath" class="td-path"></span>
-            <svg class="td-route" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-              <polyline class="td-route-base" points="11,14 45,14 45,50 84,50 84,77"></polyline>
-              <polyline id="tdRouteProgress" class="td-route-progress" points="11,14 45,14 45,50 84,50 84,77"></polyline>
-            </svg>
-            <span class="td-decor t1">🏰</span>
-            <span class="td-decor t2">🗼</span>
-            <span class="td-decor t3">🔥</span>
-            <span class="td-decor t4">🧙</span>
-            <span id="tdShots" class="td-shots"></span>
+            <canvas id="tdWebglCanvas" class="td-webgl-canvas" aria-label="Tower defense battlefield (WebGL)"></canvas>
             <span id="tdDamageLayer" class="td-damage-layer"></span>
-            <span id="tdEnemyUnit" class="td-enemy-unit">
-              <span class="td-enemy-health"><span id="tdEnemyHp"></span></span>
-              <span id="tdEnemyIcon" class="td-enemy-icon">👹</span>
-            </span>
-            <span class="td-tower-icon">🏯</span>
           </div>
           <div class="tiny" id="tdDistance">Distance to gate: 100%</div>
           <div id="tdPowerWarning" class="td-power-warning"></div>
@@ -1520,17 +1517,12 @@
       quickslots: document.getElementById("quickslots"),
       tdWave: document.getElementById("tdWave"),
       tdBreaches: document.getElementById("tdBreaches"),
-      tdEnemyHp: document.getElementById("tdEnemyHp"),
       tdDistance: document.getElementById("tdDistance"),
       tdEnemyInfo: document.getElementById("tdEnemyInfo"),
       tdDps: document.getElementById("tdDps"),
       tdSpellBonus: document.getElementById("tdSpellBonus"),
       tdReward: document.getElementById("tdReward"),
-      tdPath: document.getElementById("tdPath"),
-      tdEnemyUnit: document.getElementById("tdEnemyUnit"),
-      tdEnemyIcon: document.getElementById("tdEnemyIcon"),
-      tdRouteProgress: document.getElementById("tdRouteProgress"),
-      tdShots: document.getElementById("tdShots"),
+      tdWebglCanvas: document.getElementById("tdWebglCanvas"),
       tdDamageLayer: document.getElementById("tdDamageLayer"),
       tdPowerWarning: document.getElementById("tdPowerWarning"),
       spellSlotModal: document.getElementById("spellSlotModal"),
@@ -1562,6 +1554,170 @@
     let previousUpgradeRenderKey = "";
     let activeGearSlot = null;
     let activeSpellSlotPicker = 0;
+
+    function createTowerDefenseWebGLRenderer(canvas) {
+      const gl = canvas.getContext("webgl", { alpha: true, antialias: true });
+      if (!gl) {
+        return { render: () => {}, available: false };
+      }
+
+      const vertexShader = gl.createShader(gl.VERTEX_SHADER);
+      gl.shaderSource(vertexShader, `
+        attribute vec2 a_position;
+        uniform vec2 u_resolution;
+        void main() {
+          vec2 zeroToOne = a_position / u_resolution;
+          vec2 zeroToTwo = zeroToOne * 2.0;
+          vec2 clipSpace = zeroToTwo - 1.0;
+          gl_Position = vec4(clipSpace * vec2(1.0, -1.0), 0.0, 1.0);
+        }
+      `);
+      gl.compileShader(vertexShader);
+
+      const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+      gl.shaderSource(fragmentShader, `
+        precision mediump float;
+        uniform vec4 u_color;
+        void main() {
+          gl_FragColor = u_color;
+        }
+      `);
+      gl.compileShader(fragmentShader);
+
+      const program = gl.createProgram();
+      gl.attachShader(program, vertexShader);
+      gl.attachShader(program, fragmentShader);
+      gl.linkProgram(program);
+      gl.useProgram(program);
+
+      const positionLocation = gl.getAttribLocation(program, "a_position");
+      const resolutionLocation = gl.getUniformLocation(program, "u_resolution");
+      const colorLocation = gl.getUniformLocation(program, "u_color");
+      const positionBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.enableVertexAttribArray(positionLocation);
+      gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+      function resizeCanvas() {
+        const width = Math.max(1, Math.floor(canvas.clientWidth * window.devicePixelRatio));
+        const height = Math.max(1, Math.floor(canvas.clientHeight * window.devicePixelRatio));
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+        gl.viewport(0, 0, canvas.width, canvas.height);
+      }
+
+      const pathPoints = [
+        { x: 11, y: 14 },
+        { x: 45, y: 14 },
+        { x: 45, y: 50 },
+        { x: 84, y: 50 },
+        { x: 84, y: 77 },
+      ];
+
+      function drawTriangles(vertices, color) {
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
+        gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
+        gl.uniform4fv(colorLocation, color);
+        gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 2);
+      }
+
+      function pctToPx(point) {
+        return {
+          x: (point.x / 100) * canvas.width,
+          y: (point.y / 100) * canvas.height,
+        };
+      }
+
+      function drawRect(x, y, width, height, color) {
+        const x2 = x + width;
+        const y2 = y + height;
+        drawTriangles([x, y, x2, y, x, y2, x, y2, x2, y, x2, y2], color);
+      }
+
+      function drawCircle(pointPct, radiusPx, color) {
+        const center = pctToPx(pointPct);
+        const segments = 20;
+        const vertices = [];
+        for (let i = 0; i < segments; i += 1) {
+          const a1 = (i / segments) * Math.PI * 2;
+          const a2 = ((i + 1) / segments) * Math.PI * 2;
+          vertices.push(
+            center.x, center.y,
+            center.x + Math.cos(a1) * radiusPx, center.y + Math.sin(a1) * radiusPx,
+            center.x + Math.cos(a2) * radiusPx, center.y + Math.sin(a2) * radiusPx,
+          );
+        }
+        drawTriangles(vertices, color);
+      }
+
+      function drawSegment(aPct, bPct, widthPx, color) {
+        const a = pctToPx(aPct);
+        const b = pctToPx(bPct);
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const length = Math.hypot(dx, dy) || 1;
+        const nx = -dy / length;
+        const ny = dx / length;
+        const half = widthPx / 2;
+        drawTriangles([
+          a.x + nx * half, a.y + ny * half,
+          b.x + nx * half, b.y + ny * half,
+          a.x - nx * half, a.y - ny * half,
+          a.x - nx * half, a.y - ny * half,
+          b.x + nx * half, b.y + ny * half,
+          b.x - nx * half, b.y - ny * half,
+        ], color);
+      }
+
+      function pathSlice(progress) {
+        const clamped = Math.max(0, Math.min(1, progress));
+        const segmentCount = pathPoints.length - 1;
+        const segmentFloat = clamped * segmentCount;
+        const segmentIndex = Math.min(segmentCount - 1, Math.floor(segmentFloat));
+        const t = segmentFloat - segmentIndex;
+        const result = [pathPoints[0]];
+        for (let i = 1; i <= segmentIndex; i += 1) result.push(pathPoints[i]);
+        if (segmentIndex < segmentCount) {
+          const from = pathPoints[segmentIndex];
+          const to = pathPoints[segmentIndex + 1];
+          result.push({ x: from.x + ((to.x - from.x) * t), y: from.y + ((to.y - from.y) * t) });
+        }
+        return result;
+      }
+
+      function render(scene) {
+        resizeCanvas();
+        gl.clearColor(0.23, 0.45, 0.25, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        drawRect(0, 0, canvas.width, canvas.height * 0.22, [0.66, 0.83, 0.92, 0.28]);
+        for (let i = 0; i < pathPoints.length - 1; i += 1) {
+          drawSegment(pathPoints[i], pathPoints[i + 1], 30, scene.lowPower ? [0.55, 0.37, 0.2, 0.95] : [0.73, 0.56, 0.35, 0.95]);
+        }
+        const progressPath = pathSlice(scene.enemyProgress);
+        for (let i = 0; i < progressPath.length - 1; i += 1) {
+          drawSegment(progressPath[i], progressPath[i + 1], 14, [1, 0.95, 0.78, 0.95]);
+        }
+
+        drawCircle({ x: 84, y: 77 }, 18, [0.43, 0.38, 0.89, 1]);
+        drawCircle(scene.enemyPosition, 16, [0.75, 0.18, 0.2, 1]);
+        if (scene.freezeSec > 0) {
+          drawCircle(scene.enemyPosition, 24, [0.55, 0.8, 1, 0.3]);
+        }
+
+        for (const shot of scene.shots) {
+          drawCircle(shot.pos, 4, [0.6, 0.9, 1, Math.max(0.15, 1 - shot.progress)]);
+        }
+      }
+
+      return { render, available: true };
+    }
+
+    const tdRenderer = createTowerDefenseWebGLRenderer(els.tdWebglCanvas);
 
     function format(num) {
       if (num < 1000) return num.toFixed(1).replace(/\.0$/, "");
@@ -2729,22 +2885,25 @@
       const powerRatio = tdPowerRatio();
       const towerPowerLow = powerRatio < 1;
       const enemyPos = tdPathPosition(td.enemyProgress);
-      const routeLength = els.tdRouteProgress.getTotalLength();
-      const visibleLength = routeLength * Math.max(0, Math.min(1, td.enemyProgress));
       els.tdWave.textContent = String(td.wave);
       els.tdBreaches.textContent = String(td.breaches);
-      els.tdEnemyHp.style.width = `${hpPct.toFixed(2)}%`;
-      els.tdDistance.textContent = `Distance to gate: ${(100 - progressPct).toFixed(0)}%`;
-      els.tdEnemyUnit.style.left = `${enemyPos.x.toFixed(2)}%`;
-      els.tdEnemyUnit.style.top = `${enemyPos.y.toFixed(2)}%`;
-      els.tdRouteProgress.style.strokeDasharray = `${visibleLength.toFixed(2)} ${Math.max(0, routeLength - visibleLength).toFixed(2)}`;
-      els.tdPath.classList.toggle("low-power", towerPowerLow);
-      els.tdShots.innerHTML = td.visualShots.map((shot) => {
-        const progress = Math.min(1, shot.age / Math.max(0.001, shot.life));
-        const x = shot.from.x + ((shot.to.x - shot.from.x) * progress);
-        const y = shot.from.y + ((shot.to.y - shot.from.y) * progress);
-        return `<span class="td-shot" style="left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;opacity:${(1 - progress).toFixed(2)}"></span>`;
-      }).join("");
+      els.tdDistance.textContent = `Distance to gate: ${(100 - progressPct).toFixed(0)}% • HP ${(hpPct).toFixed(0)}%`;
+      tdRenderer.render({
+        enemyProgress: td.enemyProgress,
+        enemyPosition: enemyPos,
+        lowPower: towerPowerLow,
+        freezeSec: td.spellFreezeSec,
+        shots: td.visualShots.map((shot) => {
+          const progress = Math.min(1, shot.age / Math.max(0.001, shot.life));
+          return {
+            pos: {
+              x: shot.from.x + ((shot.to.x - shot.from.x) * progress),
+              y: shot.from.y + ((shot.to.y - shot.from.y) * progress),
+            },
+            progress,
+          };
+        }),
+      });
       els.tdDamageLayer.innerHTML = td.damageNumbers.map((num) => {
         const alpha = Math.max(0, 1 - (num.age / Math.max(0.001, num.life)));
         return `<span class="td-damage" style="left:${num.x.toFixed(2)}%;top:${num.y.toFixed(2)}%;opacity:${alpha.toFixed(2)}">-${format(num.value)}</span>`;
