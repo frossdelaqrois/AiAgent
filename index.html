@@ -28,10 +28,9 @@
       font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
       color: var(--text);
       background:
-        radial-gradient(circle at 50% 15%, rgba(59, 85, 147, 0.55) 0%, transparent 35%),
-        radial-gradient(circle at 80% 0%, rgba(106, 51, 153, 0.4) 0%, transparent 28%),
-        radial-gradient(circle at 15% 85%, rgba(163, 87, 28, 0.26) 0%, transparent 28%),
-        linear-gradient(180deg, #17131d 0%, #0c0a10 100%);
+        radial-gradient(circle at 70% 10%, rgba(194, 239, 255, 0.45) 0%, transparent 30%),
+        radial-gradient(circle at 18% 20%, rgba(124, 183, 98, 0.32) 0%, transparent 36%),
+        linear-gradient(180deg, #5fa7d8 0%, #2e6a52 24%, #3f7a3e 55%, #2c4028 100%);
       padding: 20px;
       letter-spacing: 0.02em;
     }
@@ -46,9 +45,9 @@
 
     .panel {
       background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(0, 0, 0, 0.24)),
-        radial-gradient(circle at 30% 0%, rgba(143, 84, 37, 0.25), transparent 35%),
-        linear-gradient(180deg, #31241b, #24180f);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(0, 0, 0, 0.2)),
+        radial-gradient(circle at 20% 0%, rgba(239, 209, 133, 0.25), transparent 38%),
+        linear-gradient(180deg, rgba(63, 51, 29, 0.94), rgba(39, 28, 18, 0.95));
       border: 2px solid var(--frame-edge);
       border-radius: 12px;
       padding: 16px;
@@ -555,10 +554,10 @@
     }
 
     .td-lane {
-      border: 1px solid rgba(115, 196, 255, 0.32);
-      border-radius: 10px;
-      padding: 10px;
-      background: linear-gradient(180deg, rgba(19, 13, 23, 0.9), rgba(8, 9, 18, 0.95));
+      border: 1px solid rgba(255, 227, 169, 0.35);
+      border-radius: 12px;
+      padding: 12px;
+      background: linear-gradient(180deg, rgba(67, 48, 27, 0.88), rgba(42, 28, 17, 0.92));
     }
 
     .td-track {
@@ -572,27 +571,42 @@
 
     .td-battlefield {
       position: relative;
-      height: 160px;
-      border-radius: 10px;
+      height: 290px;
+      border-radius: 16px;
       margin: 10px 0 8px;
-      border: 1px solid rgba(115, 196, 255, 0.32);
+      border: 2px solid rgba(255, 214, 132, 0.42);
       background:
-        radial-gradient(circle at 18% 22%, rgba(69, 125, 78, 0.36), transparent 35%),
-        radial-gradient(circle at 80% 70%, rgba(57, 98, 66, 0.3), transparent 40%),
-        linear-gradient(180deg, rgba(17, 37, 31, 0.95), rgba(10, 20, 23, 0.95));
+        radial-gradient(circle at 50% 12%, rgba(193, 231, 255, 0.44), transparent 34%),
+        radial-gradient(circle at 16% 88%, rgba(76, 142, 190, 0.48), transparent 30%),
+        radial-gradient(circle at 82% 24%, rgba(96, 157, 84, 0.45), transparent 36%),
+        linear-gradient(180deg, rgba(103, 163, 92, 0.98), rgba(53, 117, 53, 0.96));
       overflow: hidden;
+      box-shadow: inset 0 0 0 2px rgba(39, 69, 39, 0.46);
+    }
+
+    .td-battlefield::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 16% 33%, rgba(255, 255, 255, 0.15), transparent 20%),
+        radial-gradient(circle at 68% 60%, rgba(255, 205, 127, 0.16), transparent 25%),
+        radial-gradient(circle at 86% 78%, rgba(15, 35, 20, 0.35), transparent 27%);
+      pointer-events: none;
     }
 
     .td-path {
       position: absolute;
-      inset: 8px;
-      border-radius: 8px;
+      inset: 12px;
+      border-radius: 12px;
       background:
-        linear-gradient(90deg, transparent 0%, transparent 9%, rgba(182, 154, 102, 0.72) 9%, rgba(182, 154, 102, 0.72) 48%, transparent 48%, transparent 100%),
-        linear-gradient(180deg, transparent 0%, transparent 25%, rgba(182, 154, 102, 0.72) 25%, rgba(182, 154, 102, 0.72) 62%, transparent 62%, transparent 100%),
-        linear-gradient(90deg, transparent 0%, transparent 45%, rgba(182, 154, 102, 0.72) 45%, rgba(182, 154, 102, 0.72) 91%, transparent 91%, transparent 100%),
-        linear-gradient(180deg, transparent 0%, transparent 55%, rgba(182, 154, 102, 0.72) 55%, rgba(182, 154, 102, 0.72) 88%, transparent 88%, transparent 100%);
-      opacity: 0.9;
+        radial-gradient(circle at 12% 16%, rgba(255, 236, 196, 0.27), transparent 18%),
+        linear-gradient(90deg, transparent 0%, transparent 11%, rgba(187, 145, 89, 0.9) 11%, rgba(187, 145, 89, 0.9) 56%, transparent 56%, transparent 100%),
+        linear-gradient(180deg, transparent 0%, transparent 30%, rgba(187, 145, 89, 0.9) 30%, rgba(187, 145, 89, 0.9) 66%, transparent 66%, transparent 100%),
+        linear-gradient(90deg, transparent 0%, transparent 51%, rgba(187, 145, 89, 0.9) 51%, rgba(187, 145, 89, 0.9) 91%, transparent 91%, transparent 100%),
+        linear-gradient(180deg, transparent 0%, transparent 63%, rgba(187, 145, 89, 0.9) 63%, rgba(187, 145, 89, 0.9) 90%, transparent 90%, transparent 100%);
+      opacity: 0.95;
+      box-shadow: inset 0 0 0 1px rgba(107, 79, 46, 0.4);
     }
 
     .td-path.low-power {
@@ -603,22 +617,35 @@
     .td-enemy-icon {
       position: absolute;
       transform: translate(-50%, -50%);
-      font-size: 1.8rem;
+      font-size: 2.6rem;
       filter: drop-shadow(0 0 7px rgba(0, 0, 0, 0.55));
       z-index: 2;
     }
 
     .td-tower-icon {
-      right: 11%;
-      top: 77%;
+      right: 8%;
+      top: 81%;
       transform: translate(50%, -50%);
     }
 
     .td-enemy-icon {
-      left: 12%;
-      top: 14%;
+      left: 14%;
+      top: 16%;
       transition: left 0.12s linear, top 0.12s linear;
     }
+
+    .td-decor {
+      position: absolute;
+      font-size: 2.2rem;
+      filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.45));
+      z-index: 1;
+      opacity: 0.95;
+    }
+
+    .td-decor.t1 { left: 10%; top: 71%; }
+    .td-decor.t2 { left: 30%; top: 20%; }
+    .td-decor.t3 { right: 20%; top: 24%; }
+    .td-decor.t4 { left: 66%; top: 73%; }
 
     .td-power-warning {
       font-size: 0.75rem;
@@ -817,8 +844,12 @@
           <div class="tiny">Wave <b id="tdWave">1</b> • Breaches <b id="tdBreaches">0</b> / 5</div>
           <div class="td-battlefield">
             <span id="tdPath" class="td-path"></span>
-            <span id="tdEnemyIcon" class="td-enemy-icon">🌊</span>
-            <span class="td-tower-icon">🏰</span>
+            <span class="td-decor t1">🏰</span>
+            <span class="td-decor t2">🗼</span>
+            <span class="td-decor t3">🔥</span>
+            <span class="td-decor t4">🧙</span>
+            <span id="tdEnemyIcon" class="td-enemy-icon">👹</span>
+            <span class="td-tower-icon">🏯</span>
           </div>
           <div class="tiny" id="tdDistance">Distance to gate: 100%</div>
           <div class="tiny">Enemy HP</div>
