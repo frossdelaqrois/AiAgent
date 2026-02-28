@@ -89,6 +89,40 @@
       margin-top: 12px;
     }
 
+    .level-panel {
+      margin-top: 12px;
+      background: linear-gradient(180deg, rgba(16, 12, 8, 0.9), rgba(33, 23, 15, 0.8));
+      border: 1px solid rgba(255, 196, 97, 0.4);
+      border-radius: 10px;
+      padding: 10px;
+    }
+
+    .level-panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-bottom: 8px;
+    }
+
+    .level-bar {
+      height: 12px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.5);
+      border: 1px solid rgba(148, 203, 255, 0.35);
+    }
+
+    .level-bar > span {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, #1fb9ff, #9f43ff);
+      box-shadow: 0 0 10px rgba(122, 162, 255, 0.55);
+      transition: width 0.2s ease;
+    }
+
     .stat {
       background: linear-gradient(180deg, rgba(22, 18, 12, 0.8), rgba(16, 12, 8, 0.94));
       border-radius: 10px;
@@ -610,6 +644,14 @@
         <div class="stat"><div class="label">Arcane Rank</div><div class="value" id="rank">Novice</div></div>
         <div class="stat"><div class="label">Total Power Ever</div><div class="value" id="totalPower">0</div></div>
       </div>
+      <div class="level-panel">
+        <div class="level-panel-head">
+          <span id="playerLevel">Level 1</span>
+          <span id="levelProfitBonus">+0% profit</span>
+        </div>
+        <div class="level-bar"><span id="levelProgressFill"></span></div>
+        <div class="tiny" id="levelProgressText">0 / 0 power to next level</div>
+      </div>
       <div class="resource-strips">
         <div class="resource"><span>⚡ Power Reserve</span><b id="powerMirror">0</b></div>
         <div class="resource"><span>🔷 Spell Mana</span><b id="manaMirror">0</b></div>
@@ -993,6 +1035,8 @@
       lastTick: Date.now(),
       lastSavedAt: null,
       log: [{ text: "Welcome, wizard. Your tower awaits.", klass: "" }],
+      playerLevel: 1,
+      levelBonus: 0,
     };
 
     const els = {
@@ -1000,6 +1044,10 @@
       totalPower: document.getElementById("totalPower"),
       mps: document.getElementById("mps"),
       rank: document.getElementById("rank"),
+      playerLevel: document.getElementById("playerLevel"),
+      levelProfitBonus: document.getElementById("levelProfitBonus"),
+      levelProgressFill: document.getElementById("levelProgressFill"),
+      levelProgressText: document.getElementById("levelProgressText"),
       powerMirror: document.getElementById("powerMirror"),
       manaMirror: document.getElementById("manaMirror"),
       activeSpellName: document.getElementById("activeSpellName"),
@@ -1110,6 +1158,21 @@
       return mult;
     }
 
+    function playerLevelFromTotalPower(totalPower) {
+      const safePower = Math.max(0, totalPower);
+      return Math.max(1, Math.floor(Math.log10(safePower + 1) * 3) + 1);
+    }
+
+    function levelProgress(totalPower) {
+      const level = playerLevelFromTotalPower(totalPower);
+      const prevThreshold = level <= 1 ? 0 : ((10 ** ((level - 2) / 3)) - 1);
+      const nextThreshold = (10 ** ((level - 1) / 3)) - 1;
+      const span = Math.max(1, nextThreshold - prevThreshold);
+      const current = Math.max(0, totalPower - prevThreshold);
+      const pct = Math.max(0, Math.min(1, current / span));
+      return { level, prevThreshold, nextThreshold, pct };
+    }
+
     function getStructureSpecificMultiplier(structureKey) {
       let mult = 1;
       for (const [upKey, level] of Object.entries(state.upgrades)) {
@@ -1127,7 +1190,8 @@
         total += amount * structureData[key].mps * getStructureSpecificMultiplier(key);
       }
       const infusionBonus = 1 + (upgradeLevel("manaInfusion") * 0.06);
-      return total * productionMultiplier() * infusionBonus * gearProfitMultiplier();
+      const levelBonus = 1 + (Math.max(1, state.playerLevel || 1) - 1) * 0.05;
+      return total * productionMultiplier() * infusionBonus * gearProfitMultiplier() * levelBonus;
     }
 
     function findGear(slot, gearId) {
@@ -1336,6 +1400,9 @@
       for (const key of Object.keys(state.achievements)) {
         state.achievements[key] = Boolean(data.achievements?.[key]);
       }
+      const loadedLevel = Number(data.playerLevel || 0);
+      state.playerLevel = loadedLevel > 0 ? Math.floor(loadedLevel) : playerLevelFromTotalPower(state.totalPower);
+      state.levelBonus = Number.isFinite(data.levelBonus) ? Number(data.levelBonus) : (state.playerLevel - 1) * 0.05;
 
       state.log = Array.isArray(data.log) && data.log.length
         ? data.log.map((entry) => (typeof entry === "string" ? { text: entry, klass: "" } : entry))
@@ -1437,12 +1504,13 @@
         const level = upgradeLevel(key);
         const nextCost = getUpgradeCost(key);
         const requirementMet = meetsUpgradeRequirement(key);
-        const canReveal = Number.isFinite(nextCost) && state.power >= nextCost * 0.5;
+        const revealFactor = up.repeatable ? 0.5 : 1;
+        const canReveal = Number.isFinite(nextCost) && state.power >= nextCost * revealFactor;
         const alreadyRevealed = Boolean(state.revealedUpgrades[key]) || level > 0;
         if (!alreadyRevealed && requirementMet && canReveal) {
           state.revealedUpgrades[key] = true;
         }
-        if (level > 0 || !requirementMet || (!state.revealedUpgrades[key] && !canReveal)) continue;
+        if ((!up.repeatable && level > 0) || !requirementMet || (!state.revealedUpgrades[key] && !canReveal)) continue;
         visibleEntries.push({ key, up, nextCost, requirementMet });
       }
 
@@ -1467,6 +1535,7 @@
           <div class="upgrade-tooltip">
             <b>${up.name}</b>
             <div>${up.effect}</div>
+            ${up.repeatable ? `<div>Level: ${upgradeLevel(key)}</div>` : ""}
             <div>Cost: ${Number.isFinite(nextCost) ? format(nextCost) : "--"} power</div>
             ${up.requirementText ? `<div>Req: ${up.requirementText}${requirementMet ? "" : " (not met)"}</div>` : ""}
             <div>${up.tooltip}</div>
@@ -1644,6 +1713,13 @@
       els.totalPower.textContent = format(state.totalPower);
       els.mps.textContent = format(mps);
       els.rank.textContent = rankFromPower(state.totalPower);
+      const progress = levelProgress(state.totalPower);
+      state.playerLevel = progress.level;
+      state.levelBonus = (state.playerLevel - 1) * 0.05;
+      els.playerLevel.textContent = `Level ${state.playerLevel}`;
+      els.levelProfitBonus.textContent = `+${(state.levelBonus * 100).toFixed(0)}% profit`;
+      els.levelProgressFill.style.width = `${(progress.pct * 100).toFixed(2)}%`;
+      els.levelProgressText.textContent = `${format(state.totalPower - progress.prevThreshold)} / ${format(progress.nextThreshold - progress.prevThreshold)} power to next level`;
       const activeSpell = spellData[state.activeSpell] || spellData.bolt;
       els.powerMirror.textContent = format(state.power);
       els.manaMirror.textContent = format(state.mana);
@@ -1666,11 +1742,19 @@
       const now = Date.now();
       const delta = Math.min((now - state.lastTick) / 1000, 1);
       state.lastTick = now;
+      const oldLevel = Math.max(1, state.playerLevel || 1);
       const gain = getMps() * delta;
       if (gain > 0) {
         state.power += gain;
         state.totalPower += gain;
         state.mana += gain * 0.25;
+      }
+
+      const newLevel = playerLevelFromTotalPower(state.totalPower);
+      if (newLevel > oldLevel) {
+        state.playerLevel = newLevel;
+        state.levelBonus = (newLevel - 1) * 0.05;
+        addLog(`Level up! Reached level ${newLevel}. Profit bonus is now +${(state.levelBonus * 100).toFixed(0)}%.`, "ok");
       }
 
       autoUnlockAchievements();
