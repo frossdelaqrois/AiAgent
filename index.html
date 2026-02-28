@@ -570,6 +570,20 @@
       font-weight: 700;
     }
 
+    .gear-slot .slot-equipped {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .gear-slot .slot-equipped img {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      border: 1px solid rgba(186, 225, 255, 0.55);
+      background: rgba(0, 0, 0, 0.3);
+    }
+
     .gear-slot .slot-profit {
       font-size: 0.78rem;
       color: #9fddff;
@@ -687,6 +701,7 @@
       <h2>🛡️ Equipment</h2>
       <div class="meta">Equip gear to boost structure profits. Click a slot to browse and buy items with power.</div>
       <div id="equipmentBonus" class="meta"></div>
+      <label class="tiny"><input type="checkbox" id="equipmentLevelingToggle" /> Enable equipment leveling (exponential power costs)</label>
       <div id="equipmentSlots" class="equipment-grid"></div>
     </section>
 
@@ -962,13 +977,14 @@
     };
 
     function createGearSet(slotPrefix, names, icons, baseCost, baseBonus) {
-      const growthStep = 0.27;
+      const costGrowth = 1.85;
       const bonusStep = 0.0125;
       return names.map((name, idx) => ({
         id: `${slotPrefix}-${idx + 1}`,
         name,
         icon: webIcon(icons[idx]),
-        cost: Math.round(10 ** (Math.log10(baseCost) + idx * growthStep)),
+        tier: idx + 1,
+        cost: Math.round(baseCost * Math.pow(costGrowth, idx)),
         profitBonus: Number((baseBonus + idx * bonusStep).toFixed(3)),
       }));
     }
@@ -1029,6 +1045,8 @@
       structures: Object.fromEntries(Object.keys(structureData).map((k) => [k, 0])),
       equipment: Object.fromEntries(Object.keys(gearSlotData).map((k) => [k, null])),
       ownedGear: {},
+      gearLevels: {},
+      equipmentLevelingEnabled: false,
       upgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, 0])),
       revealedUpgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, false])),
       achievements: Object.fromEntries(achievementData.map((a) => [a.key, false])),
@@ -1061,6 +1079,7 @@
       structures: document.getElementById("structures"),
       equipmentSlots: document.getElementById("equipmentSlots"),
       equipmentBonus: document.getElementById("equipmentBonus"),
+      equipmentLevelingToggle: document.getElementById("equipmentLevelingToggle"),
       upgrades: document.getElementById("upgrades"),
       showAllUpgradesBtn: document.getElementById("showAllUpgradesBtn"),
       upgradeListModal: document.getElementById("upgradeListModal"),
@@ -1089,14 +1108,35 @@
       return `${value.toFixed(2)}${units[idx]}`;
     }
 
+    const arcaneRankTitles = [
+      "Novice", "Initiate", "Scholar", "Adept", "Master", "Archmage", "Grand Archmage",
+      ...Array.from({ length: 50 }, (_, idx) => `Eternal Arcanist ${idx + 1}`),
+    ];
+
+    const arcaneRankTiers = arcaneRankTitles.map((name, idx) => {
+      const threshold = idx === 0 ? 0 : Math.floor(300 * Math.pow(1.7, idx - 1));
+      return {
+        name,
+        threshold,
+        buffs: {
+          mpsMult: 1 + (idx * 0.03),
+          spellPowerMult: 1 + (idx * 0.025),
+          manaCostMult: Math.max(0.45, 1 - (idx * 0.01)),
+        },
+      };
+    });
+
+    function getArcaneRank(totalPower) {
+      let tier = arcaneRankTiers[0];
+      for (const entry of arcaneRankTiers) {
+        if (totalPower >= entry.threshold) tier = entry;
+        else break;
+      }
+      return tier;
+    }
+
     function rankFromPower(totalPower) {
-      if (totalPower >= 1200000) return "Grand Archmage";
-      if (totalPower >= 300000) return "Archmage";
-      if (totalPower >= 90000) return "Master";
-      if (totalPower >= 20000) return "Adept";
-      if (totalPower >= 3000) return "Scholar";
-      if (totalPower >= 400) return "Initiate";
-      return "Novice";
+      return getArcaneRank(totalPower).name;
     }
 
     function addLog(message, klass = "") {
@@ -1191,7 +1231,8 @@
       }
       const infusionBonus = 1 + (upgradeLevel("manaInfusion") * 0.06);
       const levelBonus = 1 + (Math.max(1, state.playerLevel || 1) - 1) * 0.05;
-      return total * productionMultiplier() * infusionBonus * gearProfitMultiplier() * levelBonus;
+      const rankBuff = getArcaneRank(state.totalPower).buffs.mpsMult;
+      return total * productionMultiplier() * infusionBonus * gearProfitMultiplier() * levelBonus * rankBuff;
     }
 
     function findGear(slot, gearId) {
@@ -1203,11 +1244,36 @@
       for (const [slot, gearId] of Object.entries(state.equipment)) {
         const gear = findGear(slot, gearId);
         if (!gear) continue;
-        bonus += gear.profitBonus;
+        const level = gearLevel(gear.id);
+        const levelMult = 1 + ((level - 1) * 0.35);
+        bonus += gear.profitBonus * levelMult;
       }
       return 1 + bonus;
     }
 
+    function gearLevel(gearId) {
+      return Math.max(1, Number(state.gearLevels[gearId] || 1));
+    }
+
+    function getGearLevelCost(gearId) {
+      const gear = Object.values(gearData).flat().find((entry) => entry.id === gearId);
+      if (!gear) return Infinity;
+      const level = gearLevel(gearId);
+      const base = Math.max(40, Math.floor(gear.cost * 0.7));
+      return Math.floor(base * Math.pow(1.9, level - 1));
+    }
+
+    function upgradeGearLevel(gearId) {
+      if (!state.equipmentLevelingEnabled) return;
+      if (!state.ownedGear[gearId]) return;
+      const cost = getGearLevelCost(gearId);
+      if (!canAfford(cost)) return;
+      state.power -= cost;
+      state.gearLevels[gearId] = gearLevel(gearId) + 1;
+      addLog(`Empowered ${gearId} to level ${state.gearLevels[gearId]} for ${format(cost)} power.`, "ok");
+      renderGearModal();
+      render();
+    }
 
     function spellCost(key) {
       const base = spellData[key].manaCost;
@@ -1215,7 +1281,7 @@
       const singularityDiscount = hasUpgrade("singularityCore") ? 0.75 : 1;
       const masteryDiscount = state.achievements.spellweaver ? 0.9 : 1;
       const ritualReduction = Math.max(0.55, 1 - (upgradeLevel("ritualEconomy") * 0.03));
-      return Math.floor(base * reduction * singularityDiscount * masteryDiscount * ritualReduction);
+      return Math.floor(base * reduction * singularityDiscount * masteryDiscount * ritualReduction * getArcaneRank(state.totalPower).buffs.manaCostMult);
     }
 
     function spellPower(key) {
@@ -1226,6 +1292,7 @@
       if (hasUpgrade("celestialLattice")) power *= 2.2;
       if (state.achievements.skyLord) power *= 1.15;
       power *= 1 + (upgradeLevel("arcaneStudy") * 0.08);
+      power *= getArcaneRank(state.totalPower).buffs.spellPowerMult;
       return power;
     }
 
@@ -1280,6 +1347,7 @@
       if (!alreadyOwned) {
         state.power -= gear.cost;
         state.ownedGear[gearId] = true;
+        state.gearLevels[gearId] = Math.max(1, Number(state.gearLevels[gearId] || 1));
         addLog(`Purchased ${gear.name} for ${format(gear.cost)} power.`, "ok");
       }
 
@@ -1380,14 +1448,23 @@
         state.equipment[key] = findGear(key, gearId) ? gearId : null;
       }
       state.ownedGear = {};
+      state.gearLevels = {};
+      state.equipmentLevelingEnabled = Boolean(data.equipmentLevelingEnabled);
       const loadedOwnedGear = data.ownedGear || {};
       for (const slotItems of Object.values(gearData)) {
         for (const gear of slotItems) {
           if (loadedOwnedGear[gear.id]) state.ownedGear[gear.id] = true;
+          if (state.ownedGear[gear.id]) {
+            const loadedLevel = Number(data.gearLevels?.[gear.id] || 1);
+            state.gearLevels[gear.id] = Math.max(1, loadedLevel);
+          }
         }
       }
       for (const equippedId of Object.values(state.equipment)) {
-        if (equippedId) state.ownedGear[equippedId] = true;
+        if (equippedId) {
+          state.ownedGear[equippedId] = true;
+          state.gearLevels[equippedId] = Math.max(1, Number(state.gearLevels[equippedId] || 1));
+        }
       }
       for (const key of Object.keys(state.upgrades)) {
         const loaded = data.upgrades?.[key];
@@ -1485,10 +1562,12 @@
         const slotButton = document.createElement("button");
         slotButton.type = "button";
         slotButton.className = `gear-slot ${gear ? "" : "empty"}`;
+        const level = gear ? gearLevel(gear.id) : 0;
+        const leveledBonus = gear ? gear.profitBonus * (1 + ((level - 1) * 0.35)) : 0;
         slotButton.innerHTML = `
           <div class="slot-type">${slotMeta.icon} ${slotMeta.name}</div>
-          <div class="slot-item">${gear ? gear.name : "Empty Slot"}</div>
-          <div class="slot-profit">${gear ? `+${(gear.profitBonus * 100).toFixed(1)}% profit` : "Click to browse gear"}</div>
+          <div class="slot-equipped">${gear ? `<img src="${gear.icon}" alt="${gear.name} icon" />` : ""}<div class="slot-item">${gear ? gear.name : "Empty Slot"}</div></div>
+          <div class="slot-profit">${gear ? `Lv ${level} • +${(leveledBonus * 100).toFixed(1)}% profit` : "Click to browse gear"}</div>
         `;
         slotButton.addEventListener("pointerdown", (event) => {
           event.preventDefault();
@@ -1622,6 +1701,10 @@
         const equipped = equippedId === gear.id;
         const affordable = canAfford(gear.cost);
         const disabled = !owned && !affordable;
+        const level = gearLevel(gear.id);
+        const levelCost = getGearLevelCost(gear.id);
+        const canLevel = state.equipmentLevelingEnabled && owned && canAfford(levelCost);
+        const leveledBonus = gear.profitBonus * (1 + ((level - 1) * 0.35));
 
         const row = document.createElement("div");
         row.className = "upgrade-modal-item";
@@ -1629,16 +1712,26 @@
           <img class="item-icon" src="${gear.icon || webIcon("🧰")}" alt="${gear.name} icon" />
           <div>
             <div class="name">${gear.name} ${equipped ? '<span class="pill">Equipped</span>' : ""} ${owned && !equipped ? '<span class="pill">Owned</span>' : ""}</div>
-            <div class="meta">Profit boost: +${(gear.profitBonus * 100).toFixed(1)}%</div>
+            <div class="meta">Profit boost: +${(leveledBonus * 100).toFixed(1)}% (base ${(gear.profitBonus * 100).toFixed(1)}%)</div>
             <div class="meta">Cost: ${format(gear.cost)} power</div>
+            <div class="meta">Level: ${level}${state.equipmentLevelingEnabled && owned ? ` • Next level cost: ${format(levelCost)} power` : ""}</div>
           </div>
-          <button ${disabled || equipped ? "disabled" : ""}>${owned ? "Equip" : "Buy"}</button>
+          <div style="display:grid; gap:6px;">
+            <button class="gear-buy-btn" ${disabled || equipped ? "disabled" : ""}>${owned ? "Equip" : "Buy"}</button>
+            <button class="gear-level-btn" ${!canLevel ? "disabled" : ""}>Level Up</button>
+          </div>
         `;
-        row.querySelector("button").addEventListener("pointerdown", (event) => {
+        row.querySelector(".gear-buy-btn").addEventListener("pointerdown", (event) => {
           event.preventDefault();
           event.stopPropagation();
           if (disabled || equipped) return;
           buyGear(activeGearSlot, gear.id);
+        });
+        row.querySelector(".gear-level-btn").addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!canLevel) return;
+          upgradeGearLevel(gear.id);
         });
         els.gearModalBody.appendChild(row);
       }
@@ -1712,7 +1805,9 @@
       els.power.textContent = format(state.power);
       els.totalPower.textContent = format(state.totalPower);
       els.mps.textContent = format(mps);
-      els.rank.textContent = rankFromPower(state.totalPower);
+      const rankData = getArcaneRank(state.totalPower);
+      els.rank.textContent = `${rankData.name} (+${Math.round((rankData.buffs.mpsMult - 1) * 100)}% mps / +${Math.round((rankData.buffs.spellPowerMult - 1) * 100)}% spell / -${Math.round((1 - rankData.buffs.manaCostMult) * 100)}% mana cost)`;
+      els.equipmentLevelingToggle.checked = state.equipmentLevelingEnabled;
       const progress = levelProgress(state.totalPower);
       state.playerLevel = progress.level;
       state.levelBonus = (state.playerLevel - 1) * 0.05;
@@ -1760,6 +1855,14 @@
       autoUnlockAchievements();
       render();
     }
+
+
+    els.equipmentLevelingToggle.addEventListener("change", () => {
+      state.equipmentLevelingEnabled = Boolean(els.equipmentLevelingToggle.checked);
+      addLog(`Equipment leveling ${state.equipmentLevelingEnabled ? "enabled" : "disabled"}.`, "warn");
+      renderGearModal();
+      render();
+    });
 
     els.castBtn.addEventListener("click", castSpell);
     els.saveBtn.addEventListener("click", () => saveGame(true));
