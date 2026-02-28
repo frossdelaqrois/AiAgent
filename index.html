@@ -1032,6 +1032,9 @@
 
   <div id="achievementPopups" class="achievement-popups" aria-live="polite"></div>
 
+  <script>window.__RUST_TD_ACTIVE = true;</script>
+  <script type="module" src="js/towerDefenseRust.js"></script>
+
   <script>
     const STORAGE_KEY = "arcane-idle-save-v2";
     const AUTO_SAVE_MS = 20000;
@@ -1891,9 +1894,12 @@
     }
 
 
-    const tdRenderer = createTowerDefenseWebGLRenderer(els.tdWebglCanvas);
+    const tdRenderer = window.__RUST_TD_ACTIVE
+      ? { render: () => ({ enemyHudAnchor: { x: 0, y: 0, visible: false }, damageAnchors: [] }), available: false }
+      : createTowerDefenseWebGLRenderer(els.tdWebglCanvas);
 
     els.tdWebglCanvas.addEventListener("click", (event) => {
+      if (window.__RUST_TD_ACTIVE) return;
       if (event.button !== 0) return;
       const rect = els.tdWebglCanvas.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
@@ -2287,6 +2293,7 @@
     }
 
     function updateTowerDefense(delta) {
+      if (window.__RUST_TD_ACTIVE) return;
       tickTdVisualEffects(delta);
       if (state.towerDefense.breaches >= tdMaxBreaches) return;
       if (state.towerDefense.spellFreezeSec > 0) {
@@ -3087,6 +3094,7 @@
     }
 
     function renderTowerDefense() {
+      if (window.__RUST_TD_ACTIVE) return;
       const td = state.towerDefense;
       const hpPct = Math.max(0, Math.min(100, (td.enemyHp / Math.max(1, td.enemyMaxHp)) * 100));
       const progressPct = Math.max(0, Math.min(100, td.enemyProgress * 100));
