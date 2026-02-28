@@ -202,30 +202,29 @@
     .upgrade-tooltip {
       position: absolute;
       left: 50%;
-      bottom: calc(100% + 10px);
-      transform: translateX(-50%) translateY(4px);
-      width: min(240px, 70vw);
-      padding: 8px 10px;
-      border-radius: 8px;
+      bottom: calc(100% + 12px);
+      transform: translateX(-50%) translateY(0);
+      width: min(320px, 78vw);
+      padding: 12px 13px;
+      border-radius: 10px;
       border: 1px solid rgba(255, 216, 147, 0.55);
       background: rgba(11, 8, 6, 0.97);
       color: #ffe7bf;
-      font-size: 0.78rem;
+      font-size: 0.92rem;
       line-height: 1.35;
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
       pointer-events: none;
       opacity: 0;
       visibility: hidden;
-      transition: opacity 0.12s ease, transform 0.12s ease;
       z-index: 12;
       text-align: left;
     }
 
     .upgrade-tooltip b {
       display: block;
-      margin-bottom: 4px;
+      margin-bottom: 6px;
       color: #fff6e0;
-      font-size: 0.82rem;
+      font-size: 0.98rem;
     }
 
     .upgrade-icon:hover .upgrade-tooltip,
@@ -694,7 +693,36 @@
       },
     };
 
-        const spellData = {
+    const structureOrder = Object.keys(structureData);
+    const structureUpgradeTiers = 5;
+    for (const [index, structureKey] of structureOrder.entries()) {
+      const structure = structureData[structureKey];
+      const structureSlug = structure.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+      for (let tier = 1; tier <= structureUpgradeTiers; tier += 1) {
+        const id = `${structureSlug}-amplifier-${tier}`;
+        const unlockCount = (tier * 4) + (index * 2);
+        const logarithmicScale = 1 + Math.log10(structure.baseCost * (tier + 2));
+        const tierScale = Math.pow(tier + 1, 1.55);
+        const cost = Math.floor(structure.baseCost * 18 * logarithmicScale * tierScale);
+        const bonus = Number((0.12 + (Math.log2(tier + 1) * 0.11)).toFixed(3));
+
+        upgradeData[id] = {
+          name: `${structure.name} Amplifier ${tier}`,
+          cost,
+          effect: `${structure.name} output +${Math.round(bonus * 100)}%`,
+          school: "Structure",
+          image: structure.image,
+          tooltip: `Logarithmic scaling enhancement focused on ${structure.name}. Boosts only this structure for targeted growth.`,
+          requirementText: `Own ${unlockCount} ${structure.name}${unlockCount === 1 ? "" : "s"}`,
+          requirement: (s) => s.structures[structureKey] >= unlockCount,
+          structureTarget: structureKey,
+          structureBonus: bonus,
+          apply: () => {},
+        };
+      }
+    }
+
+    const spellData = {
       bolt: { name: "Arcane Bolt", basePower: 1, manaCost: 0, unlockAt: 0, image: webIcon("✨") },
       fireball: { name: "Fireball", basePower: 40, manaCost: 30, unlockAt: 300, image: webIcon("🔥") },
       lightning: { name: "Chain Lightning", basePower: 175, manaCost: 120, unlockAt: 2500, image: webIcon("⚡") },
@@ -752,6 +780,8 @@
       achievements: document.getElementById("achievements"),
       log: document.getElementById("log"),
     };
+
+    let previousUpgradeRenderKey = "";
 
     function format(num) {
       if (num < 1000) return num.toFixed(1).replace(/\.0$/, "");
@@ -834,10 +864,21 @@
       return mult;
     }
 
+    function getStructureSpecificMultiplier(structureKey) {
+      let mult = 1;
+      for (const [upKey, level] of Object.entries(state.upgrades)) {
+        if (!level) continue;
+        const up = upgradeData[upKey];
+        if (!up || up.structureTarget !== structureKey) continue;
+        mult *= 1 + (up.structureBonus || 0);
+      }
+      return mult;
+    }
+
     function getMps() {
       let total = 0;
       for (const [key, amount] of Object.entries(state.structures)) {
-        total += amount * structureData[key].mps;
+        total += amount * structureData[key].mps * getStructureSpecificMultiplier(key);
       }
       const infusionBonus = 1 + (upgradeLevel("manaInfusion") * 0.06);
       return total * productionMultiplier() * infusionBonus;
@@ -896,6 +937,7 @@
       state.power -= cost;
       state.upgrades[key] = upgradeLevel(key) + 1;
       up.apply(state);
+      previousUpgradeRenderKey = "";
 
       if (up.repeatable) {
         addLog(`Studied ${up.name} (Level ${upgradeLevel(key)}).`, "ok");
@@ -995,6 +1037,7 @@
         const loaded = data.upgrades?.[key];
         state.upgrades[key] = loaded === true ? 1 : Number(loaded || 0);
       }
+      previousUpgradeRenderKey = "";
       for (const key of Object.keys(state.achievements)) {
         state.achievements[key] = Boolean(data.achievements?.[key]);
       }
@@ -1069,16 +1112,25 @@
     }
 
     function renderUpgrades() {
-      els.upgrades.innerHTML = "";
-      let visibleUpgrades = 0;
+      const visibleEntries = [];
       for (const [key, up] of Object.entries(upgradeData)) {
         const level = upgradeLevel(key);
-        const maxed = level > 0;
-        if (maxed) continue;
-
-        visibleUpgrades += 1;
-        const requirementMet = meetsUpgradeRequirement(key);
         const nextCost = getUpgradeCost(key);
+        const requirementMet = meetsUpgradeRequirement(key);
+        const canReveal = Number.isFinite(nextCost) && state.power >= nextCost * 0.5;
+        if (level > 0 || !requirementMet || !canReveal) continue;
+        visibleEntries.push({ key, up, nextCost, requirementMet });
+      }
+
+      const renderKey = JSON.stringify(visibleEntries.map((entry) => {
+        const affordable = canAfford(entry.nextCost);
+        return [entry.key, affordable ? 1 : 0];
+      }));
+      if (renderKey === previousUpgradeRenderKey) return;
+      previousUpgradeRenderKey = renderKey;
+
+      els.upgrades.innerHTML = "";
+      for (const { key, up, nextCost, requirementMet } of visibleEntries) {
         const disabled = !requirementMet || !canAfford(nextCost);
         const card = document.createElement("div");
         card.className = `upgrade-icon${disabled ? " disabled" : ""}`;
@@ -1113,10 +1165,10 @@
         els.upgrades.appendChild(card);
       }
 
-      if (visibleUpgrades === 0) {
+      if (visibleEntries.length === 0) {
         const empty = document.createElement("div");
         empty.className = "upgrade-empty";
-        empty.textContent = "All upgrades in this run have been learned.";
+        empty.textContent = "Earn more power and structures to reveal your next upgrades.";
         els.upgrades.appendChild(empty);
       }
     }
