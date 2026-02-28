@@ -919,49 +919,61 @@
       trinket: { name: "Trinket", icon: "🧿" },
     };
 
+    function createGearSet(slotPrefix, names, icons, baseCost, baseBonus) {
+      const growthStep = 0.27;
+      const bonusStep = 0.0125;
+      return names.map((name, idx) => ({
+        id: `${slotPrefix}-${idx + 1}`,
+        name,
+        icon: webIcon(icons[idx]),
+        cost: Math.round(10 ** (Math.log10(baseCost) + idx * growthStep)),
+        profitBonus: Number((baseBonus + idx * bonusStep).toFixed(3)),
+      }));
+    }
+
     const gearData = {
-      weapon: [
-        { id: "oak-wand", name: "Oak Initiate Wand", cost: 220, profitBonus: 0.03 },
-        { id: "ember-rod", name: "Emberglass Rod", cost: 900, profitBonus: 0.06 },
-        { id: "storm-staff", name: "Stormcaller Staff", cost: 3600, profitBonus: 0.1 },
-        { id: "rift-blade", name: "Rift Channeler Blade", cost: 22000, profitBonus: 0.15 },
-        { id: "astral-pike", name: "Astral Pike of Profit", cost: 105000, profitBonus: 0.22 },
-      ],
-      helm: [
-        { id: "linen-cowl", name: "Linen Cowl", cost: 180, profitBonus: 0.025 },
-        { id: "seer-hood", name: "Seer's Hood", cost: 780, profitBonus: 0.055 },
-        { id: "wyrm-circlet", name: "Wyrmfire Circlet", cost: 3200, profitBonus: 0.09 },
-        { id: "runic-crown", name: "Runic Crown", cost: 18000, profitBonus: 0.14 },
-        { id: "crown-archmage", name: "Crown of the Archmage", cost: 98000, profitBonus: 0.21 },
-      ],
-      chest: [
-        { id: "apprentice-robes", name: "Apprentice Robes", cost: 250, profitBonus: 0.035 },
-        { id: "weave-coat", name: "Arcweave Coat", cost: 1200, profitBonus: 0.07 },
-        { id: "plate-aether", name: "Aetherplate Vest", cost: 5400, profitBonus: 0.11 },
-        { id: "void-mail", name: "Voidbound Mail", cost: 26000, profitBonus: 0.17 },
-        { id: "mantle-cosmos", name: "Mantle of Cosmos", cost: 130000, profitBonus: 0.25 },
-      ],
-      gloves: [
-        { id: "scribe-wraps", name: "Scribe Wraps", cost: 130, profitBonus: 0.02 },
-        { id: "silk-grips", name: "Silk Grips", cost: 620, profitBonus: 0.05 },
-        { id: "golem-gauntlets", name: "Golem Gauntlets", cost: 2800, profitBonus: 0.085 },
-        { id: "fate-grasps", name: "Fategrasps", cost: 16000, profitBonus: 0.13 },
-        { id: "starhands", name: "Starhands", cost: 86000, profitBonus: 0.2 },
-      ],
-      ring: [
-        { id: "copper-band", name: "Copper Band", cost: 90, profitBonus: 0.015 },
-        { id: "moon-band", name: "Moon Band", cost: 500, profitBonus: 0.045 },
-        { id: "sigil-loop", name: "Sigil Loop", cost: 2400, profitBonus: 0.08 },
-        { id: "nexus-ring", name: "Nexus Ring", cost: 13000, profitBonus: 0.125 },
-        { id: "eternity-loop", name: "Eternity Loop", cost: 74000, profitBonus: 0.19 },
-      ],
-      trinket: [
-        { id: "apprentice-charm", name: "Apprentice Charm", cost: 140, profitBonus: 0.025 },
-        { id: "fortune-orb", name: "Fortune Orb", cost: 680, profitBonus: 0.055 },
-        { id: "echo-relic", name: "Echo Relic", cost: 3100, profitBonus: 0.095 },
-        { id: "horizon-idol", name: "Horizon Idol", cost: 17500, profitBonus: 0.145 },
-        { id: "oracle-heart", name: "Oracle Heart", cost: 92000, profitBonus: 0.215 },
-      ],
+      weapon: createGearSet(
+        "weapon",
+        ["Oak Initiate Wand", "Emberglass Rod", "Stormcaller Staff", "Rift Channeler Blade", "Astral Pike of Profit", "Sunfire Scepter", "Runeforged Spear", "Tempest Halberd", "Comet Cleaver", "Nebula Scythe", "Aether Lance", "Duskfang Saber", "Moonshard Staff", "Prism Greatblade", "Starbreaker Pike", "Chrono Rapier", "Eclipse Polearm", "Voidbrand Edge", "Aurora Chakram", "Titan Arcblade", "Celestial Reaver", "Paradox Trident", "Infinity Glaive", "Mythic Arcanum Blade", "Worldspark Relicblade"],
+        ["🪄", "🔥", "⚡", "🗡️", "🛡️", "☀️", "🔱", "🌩️", "☄️", "🌌", "💠", "🌙", "✨", "🔮", "⭐", "⏳", "🌘", "🕳️", "🌈", "🪓", "🛰️", "🔺", "♾️", "🧬", "🚀"],
+        220,
+        0.03
+      ),
+      helm: createGearSet(
+        "helm",
+        ["Linen Cowl", "Seer's Hood", "Wyrmfire Circlet", "Runic Crown", "Crown of the Archmage", "Sunveil Helm", "Tempest Visor", "Sage Diadem", "Titan Browguard", "Dawncrest Crown", "Moonlit Mask", "Aether Coronet", "Stormwake Helm", "Prismatic Tiara", "Starwrought Helm", "Chronomancer Hood", "Frosthalo Circlet", "Voidseer Crown", "Embercrest Helm", "Celestial Laurels", "Oracle Helm", "Astral Halo", "Eternity Crown", "Mythril Mindguard", "Cosmic Sovereign Helm"],
+        ["🧢", "🪖", "👑", "⛑️", "🎓", "☀️", "🌩️", "📿", "🗿", "🌅", "🌙", "💎", "⚡", "🔷", "⭐", "⏱️", "❄️", "🕳️", "🔥", "🌠", "🔭", "🪐", "♾️", "🧠", "🌌"],
+        180,
+        0.025
+      ),
+      chest: createGearSet(
+        "chest",
+        ["Apprentice Robes", "Arcweave Coat", "Aetherplate Vest", "Voidbound Mail", "Mantle of Cosmos", "Sunforged Cuirass", "Tempest Jerkin", "Moonlace Armor", "Runebound Breastplate", "Comet Ward", "Astral Harness", "Starlit Bulwark", "Duskweave Tunic", "Prism Carapace", "Embermantle", "Chrono Mail", "Frostwoven Raiment", "Abyssal Vest", "Aurora Plate", "Titan Shell", "Celestial Vestments", "Oracle Carapace", "Paradox Armor", "Mythic Starcoat", "Worldheart Aegis"],
+        ["👕", "🥋", "🦺", "🛡️", "🧥", "☀️", "🌩️", "🌙", "📜", "☄️", "🔭", "⭐", "🌒", "🔷", "🔥", "⏳", "❄️", "🕳️", "🌈", "🪨", "🌌", "🔮", "♾️", "🧬", "🌍"],
+        250,
+        0.035
+      ),
+      gloves: createGearSet(
+        "gloves",
+        ["Scribe Wraps", "Silk Grips", "Golem Gauntlets", "Fategrasps", "Starhands", "Sunthread Gloves", "Stormhide Mitts", "Moonwoven Grips", "Runebinder Gloves", "Comet Claws", "Aether Palmguards", "Dusk Talons", "Prism Knuckles", "Ember Fists", "Chrono Grips", "Frostgrasp", "Voidtouch Gloves", "Aurora Fingers", "Titan Gauntlets", "Celestial Graspers", "Oracle Touch", "Astral Handguards", "Paradox Talons", "Mythic Spellgloves", "Worldloom Mitts"],
+        ["🧤", "🪬", "🗿", "🔮", "⭐", "☀️", "🌩️", "🌙", "📜", "☄️", "💠", "🌒", "🔷", "🔥", "⏱️", "❄️", "🕳️", "🌈", "🪨", "🌌", "👁️", "🪐", "♾️", "🧬", "🌍"],
+        130,
+        0.02
+      ),
+      ring: createGearSet(
+        "ring",
+        ["Copper Band", "Moon Band", "Sigil Loop", "Nexus Ring", "Eternity Loop", "Sunband", "Tempest Ring", "Sage Coil", "Comet Loop", "Astral Ring", "Starseal Band", "Duskband", "Prism Ring", "Ember Loop", "Chrono Ring", "Frost Ring", "Void Loop", "Aurora Band", "Titan Circle", "Celestial Ring", "Oracle Loop", "Nebula Band", "Paradox Ring", "Mythic Halo Ring", "Worldthread Ring"],
+        ["💍", "🌙", "📿", "🔮", "♾️", "☀️", "🌩️", "📘", "☄️", "🪐", "⭐", "🌘", "🔷", "🔥", "⏳", "❄️", "🕳️", "🌈", "🪨", "🌌", "👁️", "🌠", "🔺", "🧬", "🌍"],
+        90,
+        0.015
+      ),
+      trinket: createGearSet(
+        "trinket",
+        ["Apprentice Charm", "Fortune Orb", "Echo Relic", "Horizon Idol", "Oracle Heart", "Sun Idol", "Tempest Totem", "Moon Relic", "Runic Fetish", "Comet Idol", "Astral Token", "Dusk Relic", "Prism Totem", "Ember Idol", "Chrono Sigil", "Frost Idol", "Void Totem", "Aurora Relic", "Titan Charm", "Celestial Idol", "Oracle Totem", "Nebula Relic", "Paradox Token", "Mythic Core", "Worldseed Charm"],
+        ["🧿", "🔮", "📿", "🗿", "❤️", "☀️", "🌩️", "🌙", "📜", "☄️", "🪐", "🌒", "🔷", "🔥", "⏱️", "❄️", "🕳️", "🌈", "🪨", "🌌", "👁️", "🌠", "♾️", "🧬", "🌍"],
+        140,
+        0.025
+      ),
     };
 
     const state = {
@@ -1545,7 +1557,7 @@
         const row = document.createElement("div");
         row.className = "upgrade-modal-item";
         row.innerHTML = `
-          <img class="item-icon" src="${webIcon("🧰")}" alt="gear icon" />
+          <img class="item-icon" src="${gear.icon || webIcon("🧰")}" alt="${gear.name} icon" />
           <div>
             <div class="name">${gear.name} ${equipped ? '<span class="pill">Equipped</span>' : ""} ${owned && !equipped ? '<span class="pill">Owned</span>' : ""}</div>
             <div class="meta">Profit boost: +${(gear.profitBonus * 100).toFixed(1)}%</div>
