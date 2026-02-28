@@ -632,6 +632,13 @@
       overflow: visible;
     }
 
+    .pet-slot-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
     @media (max-width: 900px) {
       .game { grid-template-columns: 1fr; }
       .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -703,6 +710,15 @@
       <div id="equipmentBonus" class="meta"></div>
       <label class="tiny"><input type="checkbox" id="equipmentLevelingToggle" /> Enable equipment leveling (exponential power costs)</label>
       <div id="equipmentSlots" class="equipment-grid"></div>
+    </section>
+
+    <section class="panel">
+      <h2>🐾 Pets</h2>
+      <div class="meta">Persistent support units that level through use and grant passive scaling bonuses.</div>
+      <div class="pet-slot-head">
+        <div id="petSlotsInfo" class="meta"></div>
+      </div>
+      <div id="pets" class="shop scroll-shop"></div>
     </section>
 
 
@@ -972,6 +988,49 @@
 
     const spellQuickslotCount = 5;
 
+    const petData = {
+      emberFox: {
+        name: "Ember Fox",
+        image: webIcon("🦊"),
+        bonusText: "Global production",
+        xpScale: 1,
+        bonus: (level) => 0.08 + ((level - 1) * 0.045),
+        apply: (mods, value) => { mods.production *= 1 + value; },
+      },
+      astralOwl: {
+        name: "Astral Owl",
+        image: webIcon("🦉"),
+        bonusText: "Spell power",
+        xpScale: 1,
+        bonus: (level) => 0.1 + ((level - 1) * 0.06),
+        apply: (mods, value) => { mods.spell *= 1 + value; },
+      },
+      manaSlime: {
+        name: "Mana Slime",
+        image: webIcon("🫧"),
+        bonusText: "Mana from production",
+        xpScale: 1.05,
+        bonus: (level) => 0.12 + ((level - 1) * 0.05),
+        apply: (mods, value) => { mods.manaGain *= 1 + value; },
+      },
+      clockworkImp: {
+        name: "Clockwork Imp",
+        image: webIcon("😈"),
+        bonusText: "Cast XP gain",
+        xpScale: 1.12,
+        bonus: (level) => 0.08 + ((level - 1) * 0.04),
+        apply: (mods, value) => { mods.petXp *= 1 + value; },
+      },
+      voidTurtle: {
+        name: "Void Turtle",
+        image: webIcon("🐢"),
+        bonusText: "Offline mana",
+        xpScale: 1.25,
+        bonus: (level) => 0.2 + ((level - 1) * 0.07),
+        apply: (mods, value) => { mods.offlineMana *= 1 + value; },
+      },
+    };
+
     const achievementData = [
       { key: "mana1k", name: "Power Hoarder I", image: webIcon("🥉"), test: (s) => s.totalPower >= 1000, requirement: "Accumulate 1,000 total power from any source.", reward: "+5% structure output", tooltip: "First hoarding milestone. Keep casting and buying structures until lifetime power hits 1,000." },
       { key: "mana20k", name: "Power Hoarder II", image: webIcon("🥈"), test: (s) => s.totalPower >= 20000, requirement: "Accumulate 20,000 total power over the run.", reward: "+10% structure output", tooltip: "Advanced hoarding milestone. Scale production and idle income to reach 20,000 lifetime power." },
@@ -1069,6 +1128,8 @@
       upgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, 0])),
       revealedUpgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, false])),
       achievements: Object.fromEntries(achievementData.map((a) => [a.key, false])),
+      pets: Object.fromEntries(Object.keys(petData).map((k) => [k, { level: 1, xp: 0 }])),
+      petEquipped: ["emberFox", "astralOwl"],
       lastTick: Date.now(),
       lastSavedAt: null,
       log: [{ text: "Welcome, wizard. Your tower awaits.", klass: "" }],
@@ -1113,6 +1174,8 @@
       gearModalBody: document.getElementById("gearModalBody"),
       closeGearModalBtn: document.getElementById("closeGearModalBtn"),
       achievements: document.getElementById("achievements"),
+      pets: document.getElementById("pets"),
+      petSlotsInfo: document.getElementById("petSlotsInfo"),
       log: document.getElementById("log"),
     };
 
@@ -1246,6 +1309,58 @@
       return { needed, current, pct };
     }
 
+    function getPetSlotLimit() {
+      return state.playerLevel >= 30 ? 3 : 2;
+    }
+
+    function petState(petKey) {
+      if (!state.pets[petKey]) state.pets[petKey] = { level: 1, xp: 0 };
+      return state.pets[petKey];
+    }
+
+    function petXpNeeded(level, xpScale = 1) {
+      return Math.floor(40 * Math.pow(1.5, Math.max(0, level - 1)) * xpScale);
+    }
+
+    function getPetModifiers() {
+      const mods = { production: 1, spell: 1, manaGain: 1, petXp: 1, offlineMana: 1 };
+      for (const petKey of state.petEquipped) {
+        const pet = petData[petKey];
+        if (!pet) continue;
+        const info = petState(petKey);
+        pet.apply(mods, pet.bonus(info.level));
+      }
+      return mods;
+    }
+
+    function grantPetXp(amount) {
+      if (amount <= 0 || state.petEquipped.length === 0) return;
+      const share = amount * getPetModifiers().petXp / state.petEquipped.length;
+      for (const petKey of state.petEquipped) {
+        const pet = petData[petKey];
+        if (!pet) continue;
+        const info = petState(petKey);
+        info.xp += share;
+        let leveled = false;
+        while (info.xp >= petXpNeeded(info.level, pet.xpScale)) {
+          info.xp -= petXpNeeded(info.level, pet.xpScale);
+          info.level += 1;
+          leveled = true;
+        }
+        if (leveled) addLog(`${pet.name} reached level ${info.level}.`, "ok");
+      }
+    }
+
+    function togglePetEquip(petKey) {
+      if (!petData[petKey]) return;
+      if (state.petEquipped.includes(petKey)) {
+        state.petEquipped = state.petEquipped.filter((key) => key !== petKey);
+        return;
+      }
+      if (state.petEquipped.length >= getPetSlotLimit()) return;
+      state.petEquipped.push(petKey);
+    }
+
     function getStructureSpecificMultiplier(structureKey) {
       let mult = 1;
       for (const [upKey, level] of Object.entries(state.upgrades)) {
@@ -1265,7 +1380,7 @@
       const infusionBonus = 1 + (upgradeLevel("manaInfusion") * 0.06);
       const levelBonus = 1 + (Math.max(1, state.playerLevel || 1) - 1) * 0.05;
       const rankBuff = getArcaneRank(state.totalPower).buffs.mpsMult;
-      return total * productionMultiplier() * infusionBonus * gearProfitMultiplier() * levelBonus * rankBuff;
+      return total * productionMultiplier() * infusionBonus * gearProfitMultiplier() * levelBonus * rankBuff * getPetModifiers().production;
     }
 
     function findGear(slot, gearId) {
@@ -1340,6 +1455,7 @@
       if (state.achievements.skyLord) power *= 1.15;
       power *= 1 + (upgradeLevel("arcaneStudy") * 0.08);
       power *= getArcaneRank(state.totalPower).buffs.spellPowerMult;
+      power *= getPetModifiers().spell;
       return power;
     }
 
@@ -1470,6 +1586,7 @@
       state.totalPower += power;
       state.levelProgressPower += power;
       state.spellCasts += 1;
+      grantPetXp(Math.max(1, power * 0.03));
       state.activeQuickslot = Math.min(Math.max(0, state.activeQuickslot), spellQuickslotCount - 1);
       applyLevelUps();
       if (state.spellCasts % 25 === 0) {
@@ -1543,6 +1660,21 @@
       for (const key of Object.keys(state.achievements)) {
         state.achievements[key] = Boolean(data.achievements?.[key]);
       }
+      for (const petKey of Object.keys(petData)) {
+        const loadedPet = data.pets?.[petKey];
+        state.pets[petKey] = {
+          level: Math.max(1, Math.floor(Number(loadedPet?.level || 1))),
+          xp: Math.max(0, Number(loadedPet?.xp || 0)),
+        };
+      }
+      const loadedEquipped = Array.isArray(data.petEquipped)
+        ? data.petEquipped.filter((petKey) => petData[petKey])
+        : [];
+      const slotLimit = getPetSlotLimit();
+      state.petEquipped = loadedEquipped.slice(0, slotLimit);
+      if (state.petEquipped.length === 0) {
+        state.petEquipped = Object.keys(petData).slice(0, slotLimit);
+      }
       const loadedLevel = Number(data.playerLevel || 0);
       const loadedProgress = Number(data.levelProgressPower);
       if (loadedLevel > 0) {
@@ -1570,9 +1702,10 @@
       state.power += gained;
       state.totalPower += gained;
       state.levelProgressPower += gained;
-      state.mana += gained * 0.25;
+      state.mana += gained * 0.25 * getPetModifiers().offlineMana;
+      grantPetXp(gained * 0.0012);
       applyLevelUps();
-      addLog(`You were away for ${Math.floor(elapsedSeconds)}s and gained ${format(gained)} power and ${format(gained * 0.25)} mana.`, "warn");
+      addLog(`You were away for ${Math.floor(elapsedSeconds)}s and gained ${format(gained)} power and ${format(gained * 0.25 * getPetModifiers().offlineMana)} mana.`, "warn");
     }
 
     function loadGame() {
@@ -1650,6 +1783,41 @@
           openGearModal(slot);
         });
         els.equipmentSlots.appendChild(slotButton);
+      }
+    }
+
+    function renderPets() {
+      els.pets.innerHTML = "";
+      const slotLimit = getPetSlotLimit();
+      els.petSlotsInfo.textContent = `Equipped: ${state.petEquipped.length} / ${slotLimit} slots`;
+
+      for (const [petKey, pet] of Object.entries(petData)) {
+        const info = petState(petKey);
+        const needed = petXpNeeded(info.level, pet.xpScale);
+        const pct = Math.max(0, Math.min(100, (info.xp / needed) * 100));
+        const bonusPct = pet.bonus(info.level) * 100;
+        const equipped = state.petEquipped.includes(petKey);
+        const blocked = !equipped && state.petEquipped.length >= slotLimit;
+        const card = document.createElement("div");
+        card.className = "item";
+        card.innerHTML = `
+          <img class="item-icon" src="${pet.image}" alt="${pet.name} icon" title="${pet.bonusText}" />
+          <div>
+            <div class="name">${pet.name} ${equipped ? '<span class="pill">Equipped</span>' : ""}</div>
+            <div class="meta">Lv ${info.level} • ${pet.bonusText}: +${bonusPct.toFixed(1)}%</div>
+            <div class="meta">XP ${format(info.xp)} / ${format(needed)}</div>
+            <div class="level-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
+          </div>
+          <button ${blocked ? "disabled" : ""}>${equipped ? "Unequip" : "Equip"}</button>
+        `;
+
+        card.querySelector("button").addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          togglePetEquip(petKey);
+          render();
+        });
+        els.pets.appendChild(card);
       }
     }
 
@@ -1958,6 +2126,7 @@
 
       renderStructures();
       renderEquipment();
+      renderPets();
       renderUpgrades();
       renderQuickslots();
       renderAchievements();
@@ -1973,7 +2142,8 @@
         state.power += gain;
         state.totalPower += gain;
         state.levelProgressPower += gain;
-        state.mana += gain * 0.25;
+        state.mana += gain * 0.25 * getPetModifiers().manaGain;
+        grantPetXp(gain * 0.0025);
       }
       applyLevelUps();
 
