@@ -339,27 +339,33 @@
         <span>🧙 Arcane Idle: Wizard Tower</span>
         <span class="pill">Idle + Clicker</span>
       </h1>
-      <div class="sub">Gather mana, train apprentices, and automate your magical empire with a richer fantasy HUD.</div>
+      <div class="sub">Gather power, train apprentices, and automate your magical empire with a richer fantasy HUD.</div>
       <div class="row">
-        <button id="castBtn">✨ Cast <span id="activeSpellName">Arcane Bolt</span> (<span id="spellPower">+1</span>)</button>
+        <button id="castBtn">✨ Cast <span id="activeSpellName">Arcane Bolt</span> (<span id="spellPower">+1 power</span>)</button>
         <button id="saveBtn" class="btn-secondary">💾 Save</button>
         <button id="resetBtn" class="btn-danger">♻️ Reset</button>
       </div>
       <div class="stats">
-        <div class="stat"><div class="label">Mana</div><div class="value" id="mana">0</div></div>
-        <div class="stat"><div class="label">Mana / sec</div><div class="value" id="mps">0</div></div>
+        <div class="stat"><div class="label">Power</div><div class="value" id="power">0</div></div>
+        <div class="stat"><div class="label">Power / sec</div><div class="value" id="mps">0</div></div>
         <div class="stat"><div class="label">Arcane Rank</div><div class="value" id="rank">Novice</div></div>
-        <div class="stat"><div class="label">Total Mana Ever</div><div class="value" id="totalMana">0</div></div>
+        <div class="stat"><div class="label">Total Power Ever</div><div class="value" id="totalPower">0</div></div>
         <div class="stat"><div class="label">Autosave</div><div class="value" id="saveState">Ready</div></div>
         <div class="stat"><div class="label">Buy Amount</div><div class="value" id="buyAmountLabel">x1</div></div>
         <div class="stat"><div class="label">Bolt Power</div><div class="value" id="clickPower">1</div></div>
       </div>
       <div class="resource-strips">
         <div class="resource"><span>🪙 Gold Reserve</span><b id="goldMirror">0</b></div>
-        <div class="resource"><span>🔷 Mana Pool</span><b id="manaMirror">0</b></div>
-        <div class="resource"><span>💜 Arcane Crystal Stock</span><b id="crystalMirror">0</b></div>
+        <div class="resource"><span>⚡ Power Reserve</span><b id="powerMirror">0</b></div>
+        <div class="resource"><span>🔷 Spell Mana</span><b id="manaMirror">0</b></div>
       </div>
-      <div class="tiny">Tip: Press <strong>Space</strong> to cast your selected spell, or use <strong>1-5</strong> to cast spells directly from quickslots.</div>
+      <div class="tiny">Tip: Press <strong>Space</strong> to cast your selected spell using mana, or use <strong>1-5</strong> to cast spells directly from quickslots.</div>
+    </section>
+
+
+    <section class="panel wide">
+      <h2>⚔️ Spell Quickslots</h2>
+      <div id="quickslots" class="quickslot-bar"></div>
     </section>
 
     <section class="panel">
@@ -379,10 +385,7 @@
 
 
     <section class="panel">
-      <h2>⚔️ Spells</h2>
-      <div id="spells" class="spell-grid"></div>
-      <div id="quickslots" class="quickslot-bar"></div>
-      <h3 style="margin-top: 16px;">🏆 Achievements</h3>
+      <h2>🏆 Achievements</h2>
       <div id="achievements" class="shop scroll-shop"></div>
     </section>
 
@@ -519,10 +522,10 @@
     const spellQuickslotOrder = ["bolt", "fireball", "lightning", "meteor", "voidburst"];
 
     const achievementData = [
-      { key: "mana1k", name: "Mana Hoarder I", image: webIcon("🥉"), test: (s) => s.totalMana >= 1000, requirement: "Accumulate 1,000 total mana from any source.", reward: "+5% structure output", tooltip: "First hoarding milestone. Keep casting and buying structures until lifetime mana hits 1,000." },
-      { key: "mana20k", name: "Mana Hoarder II", image: webIcon("🥈"), test: (s) => s.totalMana >= 20000, requirement: "Accumulate 20,000 total mana over the run.", reward: "+10% structure output", tooltip: "Advanced hoarding milestone. Scale production and idle income to reach 20,000 lifetime mana." },
-      { key: "mana250k", name: "Mana Hoarder III", image: webIcon("🥇"), test: (s) => s.totalMana >= 250000, requirement: "Accumulate 250,000 total mana.", reward: "+15% structure output", tooltip: "A mid-game mastery checkpoint that rewards sustained scaling." },
-      { key: "mana2m", name: "Mana Sovereign", image: webIcon("👑"), test: (s) => s.totalMana >= 2000000, requirement: "Accumulate 2,000,000 total mana.", reward: "+25% structure output", tooltip: "A late milestone for long sessions, requiring a truly automated tower." },
+      { key: "mana1k", name: "Power Hoarder I", image: webIcon("🥉"), test: (s) => s.totalPower >= 1000, requirement: "Accumulate 1,000 total power from any source.", reward: "+5% structure output", tooltip: "First hoarding milestone. Keep casting and buying structures until lifetime power hits 1,000." },
+      { key: "mana20k", name: "Power Hoarder II", image: webIcon("🥈"), test: (s) => s.totalPower >= 20000, requirement: "Accumulate 20,000 total power over the run.", reward: "+10% structure output", tooltip: "Advanced hoarding milestone. Scale production and idle income to reach 20,000 lifetime power." },
+      { key: "mana250k", name: "Power Hoarder III", image: webIcon("🥇"), test: (s) => s.totalPower >= 250000, requirement: "Accumulate 250,000 total power.", reward: "+15% structure output", tooltip: "A mid-game mastery checkpoint that rewards sustained scaling." },
+      { key: "mana2m", name: "Power Sovereign", image: webIcon("👑"), test: (s) => s.totalPower >= 2000000, requirement: "Accumulate 2,000,000 total power.", reward: "+25% structure output", tooltip: "A late milestone for long sessions, requiring a truly automated tower." },
       { key: "golem3", name: "Golem Battalion", image: webIcon("🏅"), test: (s) => s.structures.golem >= 3, requirement: "Own 3 Arcane Golems at the same time.", reward: "+15 click power", tooltip: "Construct three Arcane Golems to earn this badge and permanently strengthen manual casting." },
       { key: "towerTycoon", name: "Tower Tycoon", image: webIcon("🏛️"), test: (s) => Object.values(s.structures).reduce((sum, amount) => sum + amount, 0) >= 80, requirement: "Own 80 total structures.", reward: "+20% structure output", tooltip: "Rewards broad investment across your whole structure roster." },
       { key: "skyLord", name: "Lord of the Sky", image: webIcon("🏰"), test: (s) => s.structures.skyCitadel >= 5, requirement: "Own 5 Sky Citadels.", reward: "+15% spell power", tooltip: "Your floating strongholds improve spell efficiency across all casts." },
@@ -531,8 +534,9 @@
     ];
 
     const state = {
+      power: 0,
       mana: 0,
-      totalMana: 0,
+      totalPower: 0,
       clickPower: 1,
       buyAmount: 1,
       activeSpell: "bolt",
@@ -546,20 +550,19 @@
     };
 
     const els = {
-      mana: document.getElementById("mana"),
-      totalMana: document.getElementById("totalMana"),
+      power: document.getElementById("power"),
+      totalPower: document.getElementById("totalPower"),
       mps: document.getElementById("mps"),
       rank: document.getElementById("rank"),
       clickPower: document.getElementById("clickPower"),
       saveState: document.getElementById("saveState"),
       buyAmountLabel: document.getElementById("buyAmountLabel"),
       goldMirror: document.getElementById("goldMirror"),
+      powerMirror: document.getElementById("powerMirror"),
       manaMirror: document.getElementById("manaMirror"),
-      crystalMirror: document.getElementById("crystalMirror"),
       activeSpellName: document.getElementById("activeSpellName"),
       spellPower: document.getElementById("spellPower"),
       castBtn: document.getElementById("castBtn"),
-      spells: document.getElementById("spells"),
       quickslots: document.getElementById("quickslots"),
       saveBtn: document.getElementById("saveBtn"),
       resetBtn: document.getElementById("resetBtn"),
@@ -582,13 +585,13 @@
       return `${value.toFixed(2)}${units[idx]}`;
     }
 
-    function rankFromMana(totalMana) {
-      if (totalMana >= 1200000) return "Grand Archmage";
-      if (totalMana >= 300000) return "Archmage";
-      if (totalMana >= 90000) return "Master";
-      if (totalMana >= 20000) return "Adept";
-      if (totalMana >= 3000) return "Scholar";
-      if (totalMana >= 400) return "Initiate";
+    function rankFromPower(totalPower) {
+      if (totalPower >= 1200000) return "Grand Archmage";
+      if (totalPower >= 300000) return "Archmage";
+      if (totalPower >= 90000) return "Master";
+      if (totalPower >= 20000) return "Adept";
+      if (totalPower >= 3000) return "Scholar";
+      if (totalPower >= 400) return "Initiate";
       return "Novice";
     }
 
@@ -655,10 +658,14 @@
     }
 
     function isSpellUnlocked(key) {
-      return state.totalMana >= spellData[key].unlockAt;
+      return state.totalPower >= spellData[key].unlockAt;
     }
 
     function canAfford(cost) {
+      return state.power >= cost;
+    }
+
+    function canAffordMana(cost) {
       return state.mana >= cost;
     }
 
@@ -667,7 +674,7 @@
       const totalCost = getBulkStructureCost(key, amount);
       if (!canAfford(totalCost)) return;
 
-      state.mana -= totalCost;
+      state.power -= totalCost;
       state.structures[key] += amount;
       addLog(`Purchased ${amount} ${structureData[key].name}${amount > 1 ? "s" : ""}.`, "ok");
       render();
@@ -676,7 +683,7 @@
     function buyUpgrade(key) {
       const up = upgradeData[key];
       if (state.upgrades[key] || !canAfford(up.cost)) return;
-      state.mana -= up.cost;
+      state.power -= up.cost;
       state.upgrades[key] = true;
       up.apply(state);
       addLog(`Learned upgrade: ${up.name}. ${up.effect}`, "ok");
@@ -708,12 +715,12 @@
       const key = spellData[spellKey] ? spellKey : "bolt";
       if (!isSpellUnlocked(key)) return;
       const cost = spellCost(key);
-      if (state.mana < cost) return;
+      if (!canAffordMana(cost)) return;
 
       const power = spellPower(key);
       state.mana -= cost;
-      state.mana += power;
-      state.totalMana += power;
+      state.power += power;
+      state.totalPower += power;
       state.spellCasts += 1;
       if (state.spellCasts % 25 === 0) {
         addLog(`Arcane rhythm! ${state.spellCasts} spells cast so far.`, "warn");
@@ -722,7 +729,7 @@
     }
 
     function saveGame(showToast = true) {
-      const payload = { ...state, lastTick: Date.now(), log: state.log.slice(0, 60) };
+      const payload = { ...state, totalMana: state.totalPower, power: state.power, mana: state.mana, lastTick: Date.now(), log: state.log.slice(0, 60) };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
       state.lastSavedAt = Date.now();
       if (showToast) addLog("Game saved.", "ok");
@@ -730,8 +737,9 @@
     }
 
     function normalizeLoadedState(data) {
+      state.power = Number((data.power ?? data.mana) || 0);
       state.mana = Number(data.mana || 0);
-      state.totalMana = Number(data.totalMana || 0);
+      state.totalPower = Number((data.totalPower ?? data.totalMana) || 0);
       state.clickPower = Number(data.clickPower || 1);
       state.buyAmount = [1, 10, 25].includes(Number(data.buyAmount)) ? Number(data.buyAmount) : 1;
       state.activeSpell = typeof data.activeSpell === "string" && spellData[data.activeSpell] ? data.activeSpell : "bolt";
@@ -759,9 +767,10 @@
       const gained = getMps() * elapsedSeconds;
       if (gained <= 0) return;
 
-      state.mana += gained;
-      state.totalMana += gained;
-      addLog(`You were away for ${Math.floor(elapsedSeconds)}s and gained ${format(gained)} mana.`, "warn");
+      state.power += gained;
+      state.totalPower += gained;
+      state.mana += gained * 0.25;
+      addLog(`You were away for ${Math.floor(elapsedSeconds)}s and gained ${format(gained)} power and ${format(gained * 0.25)} mana.`, "warn");
     }
 
     function loadGame() {
@@ -799,8 +808,8 @@
           <img class="item-icon" src="${data.image}" alt="${data.name} icon" title="${data.tooltip}" />
           <div>
             <div class="name">${data.name} <span class="pill">Owned: ${owned}</span></div>
-            <div class="meta">+${format(data.mps)}/sec each • Next: ${format(nextCost)} mana</div>
-            <div class="meta">Buy ${state.buyAmount}: ${format(bulkCost)} mana</div>
+            <div class="meta">+${format(data.mps)}/sec each • Next: ${format(nextCost)} power</div>
+            <div class="meta">Buy ${state.buyAmount}: ${format(bulkCost)} power</div>
           </div>
           <button ${disabled ? "disabled" : ""}>Buy x${state.buyAmount}</button>
         `;
@@ -826,7 +835,7 @@
           <img class="item-icon" src="${up.image}" alt="${up.name} icon" title="${up.tooltip}" />
           <div>
             <div class="name">${up.name} ${unlocked ? '<span class="pill">Learned</span>' : ""}</div>
-            <div class="meta">${up.effect} • Cost: ${format(up.cost)} mana</div>
+            <div class="meta">${up.effect} • Cost: ${format(up.cost)} power</div>
           </div>
           <button ${disabled ? "disabled" : ""}>${unlocked ? "Done" : "Research"}</button>
         `;
@@ -840,52 +849,6 @@
       }
     }
 
-    function renderSpells() {
-      els.spells.innerHTML = "";
-      for (const [key, spell] of Object.entries(spellData)) {
-        const unlocked = isSpellUnlocked(key);
-        const selected = state.activeSpell === key;
-        const cost = spellCost(key);
-        const power = spellPower(key);
-
-        const card = document.createElement("div");
-        card.className = "spell-card";
-        card.innerHTML = `
-          <div class="spell-head">
-            <img class="spell-icon" src="${spell.image}" alt="${spell.name} icon" />
-            <div>
-              <div class="name">${spell.name} ${selected ? '<span class="pill">Selected</span>' : ''}</div>
-              <div class="spell-mini">Power: +${format(power)} mana</div>
-              <div class="spell-mini">Cost: ${format(cost)} mana</div>
-            </div>
-          </div>
-          <div class="row">
-            <button ${unlocked ? "" : "disabled"} data-action="select">${selected ? "Selected" : "Select"}</button>
-            <button ${(!unlocked || !canAfford(cost)) ? "disabled" : ""} data-action="cast">Cast</button>
-          </div>
-        `;
-
-        const selectButton = card.querySelector('[data-action="select"]');
-        const castButton = card.querySelector('[data-action="cast"]');
-        selectButton.addEventListener("pointerdown", (event) => {
-          event.preventDefault();
-          state.activeSpell = key;
-          render();
-        });
-        castButton.addEventListener("pointerdown", (event) => {
-          event.preventDefault();
-          castSpell(key);
-        });
-        if (!unlocked) {
-          const req = document.createElement("div");
-          req.className = "spell-mini";
-          req.textContent = `Unlock at total mana: ${format(spell.unlockAt)}`;
-          card.appendChild(req);
-        }
-        els.spells.appendChild(card);
-      }
-    }
-
     function renderQuickslots() {
       els.quickslots.innerHTML = "";
       for (let idx = 0; idx < spellQuickslotOrder.length; idx += 1) {
@@ -894,7 +857,7 @@
         if (!spell) continue;
         const unlocked = isSpellUnlocked(key);
         const cost = spellCost(key);
-        const canCast = unlocked && canAfford(cost);
+        const canCast = unlocked && canAffordMana(cost);
 
         const slot = document.createElement("button");
         slot.type = "button";
@@ -906,7 +869,7 @@
           <span>${spell.name}</span>
           <span class="slot-cost">${unlocked ? format(cost) + " mana" : "Locked"}</span>
         `;
-        slot.title = unlocked ? `Cast ${spell.name}` : `Unlock at ${format(spell.unlockAt)} total mana`;
+        slot.title = unlocked ? `Cast ${spell.name}` : `Unlock at ${format(spell.unlockAt)} total power`;
         slot.addEventListener("pointerdown", (event) => {
           event.preventDefault();
           castSpell(key);
@@ -948,18 +911,18 @@
 
     function render() {
       const mps = getMps();
-      els.mana.textContent = format(state.mana);
-      els.totalMana.textContent = format(state.totalMana);
+      els.power.textContent = format(state.power);
+      els.totalPower.textContent = format(state.totalPower);
       els.mps.textContent = format(mps);
-      els.rank.textContent = rankFromMana(state.totalMana);
+      els.rank.textContent = rankFromPower(state.totalPower);
       const activeSpell = spellData[state.activeSpell] || spellData.bolt;
       els.clickPower.textContent = format(state.clickPower);
       els.buyAmountLabel.textContent = `x${state.buyAmount}`;
-      els.goldMirror.textContent = format(state.totalMana * 0.42 + 150);
+      els.goldMirror.textContent = format(state.totalPower * 0.42 + 150);
+      els.powerMirror.textContent = format(state.power);
       els.manaMirror.textContent = format(state.mana);
-      els.crystalMirror.textContent = format(state.totalMana / 8 + Object.values(state.upgrades).filter(Boolean).length * 25);
-      els.activeSpellName.textContent = activeSpell.name;
-      els.spellPower.textContent = `+${format(spellPower(state.activeSpell))} mana`;
+            els.activeSpellName.textContent = activeSpell.name;
+      els.spellPower.textContent = `+${format(spellPower(state.activeSpell))} power`;
 
       if (state.lastSavedAt) {
         const age = Math.max(0, Math.floor((Date.now() - state.lastSavedAt) / 1000));
@@ -974,7 +937,6 @@
 
       renderStructures();
       renderUpgrades();
-      renderSpells();
       renderQuickslots();
       renderAchievements();
       renderLog();
@@ -986,8 +948,9 @@
       state.lastTick = now;
       const gain = getMps() * delta;
       if (gain > 0) {
-        state.mana += gain;
-        state.totalMana += gain;
+        state.power += gain;
+        state.totalPower += gain;
+        state.mana += gain * 0.25;
       }
       render();
     }
