@@ -670,7 +670,7 @@
         <div class="resource"><span>⚡ Power Reserve</span><b id="powerMirror">0</b></div>
         <div class="resource"><span>🔷 Spell Mana</span><b id="manaMirror">0</b></div>
       </div>
-      <div class="tiny">Tip: Press <strong>Space</strong> to cast your selected spell using mana, or use <strong>1-5</strong> to cast spells directly from quickslots.</div>
+      <div class="tiny">Tip: Click a quickslot to assign a learned spell. Press <strong>Space</strong> to cast your selected slot, or <strong>1-5</strong> to cast from a specific slot.</div>
     </section>
 
 
@@ -734,6 +734,16 @@
         <button id="closeGearModalBtn" class="btn-ghost" type="button">Close</button>
       </div>
       <div id="gearModalBody" class="upgrade-modal-list"></div>
+    </div>
+  </div>
+
+  <div id="spellSlotModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="spellSlotModalTitle">
+    <div class="upgrade-modal panel">
+      <div class="upgrade-modal-header">
+        <h3 id="spellSlotModalTitle">Assign Spell</h3>
+        <button id="closeSpellSlotModalBtn" class="btn-ghost" type="button">Close</button>
+      </div>
+      <div id="spellSlotModalBody" class="upgrade-modal-list"></div>
     </div>
   </div>
 
@@ -945,15 +955,22 @@
       }
     }
 
-    const spellData = {
-      bolt: { name: "Arcane Bolt", basePower: 1, manaCost: 0, unlockAt: 0, image: webIcon("✨") },
-      fireball: { name: "Fireball", basePower: 40, manaCost: 30, unlockAt: 300, image: webIcon("🔥") },
-      lightning: { name: "Chain Lightning", basePower: 175, manaCost: 120, unlockAt: 2500, image: webIcon("⚡") },
-      meteor: { name: "Meteor Strike", basePower: 800, manaCost: 620, unlockAt: 14000, image: webIcon("🌠") },
-      voidburst: { name: "Void Burst", basePower: 3200, manaCost: 2600, unlockAt: 70000, image: webIcon("🌀") },
-    };
+    const spellGlyphs = ["✨", "🔥", "⚡", "🌠", "🌀", "❄️", "🌪️", "☄️", "🌙", "💥", "💫", "🪄", "🌌", "🔮", "🧿", "🌋", "🪽", "🕯️", "🪐", "🌈", "🧬", "💎", "⭐", "☀️", "🌊", "🌱", "⏳", "🛸", "🪞", "⚔️", "🧲", "🧠", "🎇", "🌀", "🌫️", "🗝️", "🧊", "🧨", "🦉", "🦴", "🪬", "🧵", "🕳️", "🗿", "🛰️", "🕸️", "🥀", "🌍", "🌋", "☯️"];
 
-    const spellQuickslotOrder = ["bolt", "fireball", "lightning", "meteor", "voidburst"];
+    const spellData = Object.fromEntries(Array.from({ length: 50 }, (_, idx) => {
+      const id = `spell${idx + 1}`;
+      const tier = idx + 1;
+      return [id, {
+        id,
+        name: `Arcane Spell ${tier}`,
+        basePower: Math.floor(14 * Math.pow(1.31, tier - 1)),
+        manaCost: Math.max(6, Math.floor(7 * Math.pow(1.26, tier - 1))),
+        unlockLevel: tier + 1,
+        image: webIcon(spellGlyphs[idx] || "✨"),
+      }];
+    }));
+
+    const spellQuickslotCount = 5;
 
     const achievementData = [
       { key: "mana1k", name: "Power Hoarder I", image: webIcon("🥉"), test: (s) => s.totalPower >= 1000, requirement: "Accumulate 1,000 total power from any source.", reward: "+5% structure output", tooltip: "First hoarding milestone. Keep casting and buying structures until lifetime power hits 1,000." },
@@ -1040,7 +1057,8 @@
       totalPower: 0,
       clickPower: 1,
       buyAmount: 1,
-      activeSpell: "bolt",
+      activeQuickslot: 0,
+      quickslots: Array.from({ length: spellQuickslotCount }, () => null),
       spellCasts: 0,
       structures: Object.fromEntries(Object.keys(structureData).map((k) => [k, 0])),
       equipment: Object.fromEntries(Object.keys(gearSlotData).map((k) => [k, null])),
@@ -1074,6 +1092,10 @@
       achievementPopups: document.getElementById("achievementPopups"),
       castBtn: document.getElementById("castBtn"),
       quickslots: document.getElementById("quickslots"),
+      spellSlotModal: document.getElementById("spellSlotModal"),
+      spellSlotModalTitle: document.getElementById("spellSlotModalTitle"),
+      spellSlotModalBody: document.getElementById("spellSlotModalBody"),
+      closeSpellSlotModalBtn: document.getElementById("closeSpellSlotModalBtn"),
       saveBtn: document.getElementById("saveBtn"),
       resetBtn: document.getElementById("resetBtn"),
       buyToggle: document.getElementById("buyToggle"),
@@ -1096,6 +1118,7 @@
 
     let previousUpgradeRenderKey = "";
     let activeGearSlot = null;
+    let activeSpellSlotPicker = 0;
 
     function format(num) {
       if (num < 1000) return num.toFixed(1).replace(/\.0$/, "");
@@ -1320,7 +1343,11 @@
     }
 
     function isSpellUnlocked(key) {
-      return state.totalPower >= spellData[key].unlockAt;
+      return state.playerLevel >= spellData[key].unlockLevel;
+    }
+
+    function selectedSpellKey() {
+      return state.quickslots[state.activeQuickslot] || null;
     }
 
     function canAfford(cost) {
@@ -1429,8 +1456,9 @@
       }, 3200);
     }
 
-    function castSpell(spellKey = state.activeSpell) {
-      const key = spellData[spellKey] ? spellKey : "bolt";
+    function castSpell(spellKey = selectedSpellKey()) {
+      const key = spellData[spellKey] ? spellKey : null;
+      if (!key) return;
       if (!isSpellUnlocked(key)) return;
       const cost = spellCost(key);
       if (!canAffordMana(cost)) return;
@@ -1441,6 +1469,7 @@
       state.totalPower += power;
       state.levelProgressPower += power;
       state.spellCasts += 1;
+      state.activeQuickslot = Math.min(Math.max(0, state.activeQuickslot), spellQuickslotCount - 1);
       applyLevelUps();
       if (state.spellCasts % 25 === 0) {
         addLog(`Arcane rhythm! ${state.spellCasts} spells cast so far.`, "warn");
@@ -1462,7 +1491,15 @@
       state.totalPower = Number((data.totalPower ?? data.totalMana) || 0);
       state.clickPower = Number(data.clickPower || 1);
       state.buyAmount = [1, 10, 25].includes(Number(data.buyAmount)) ? Number(data.buyAmount) : 1;
-      state.activeSpell = typeof data.activeSpell === "string" && spellData[data.activeSpell] ? data.activeSpell : "bolt";
+      state.activeQuickslot = Number.isInteger(data.activeQuickslot) ? Math.min(Math.max(0, data.activeQuickslot), spellQuickslotCount - 1) : 0;
+      const loadedSlots = Array.isArray(data.quickslots) ? data.quickslots : [];
+      state.quickslots = Array.from({ length: spellQuickslotCount }, (_, idx) => {
+        const key = loadedSlots[idx];
+        return typeof key === "string" && spellData[key] ? key : null;
+      });
+      if (!Array.isArray(data.quickslots) && typeof data.activeSpell === "string" && spellData[data.activeSpell]) {
+        state.quickslots[0] = data.activeSpell;
+      }
       state.spellCasts = Number(data.spellCasts || 0);
 
       for (const key of Object.keys(state.structures)) {
@@ -1783,30 +1820,85 @@
 
     function renderQuickslots() {
       els.quickslots.innerHTML = "";
-      for (let idx = 0; idx < spellQuickslotOrder.length; idx += 1) {
-        const key = spellQuickslotOrder[idx];
-        const spell = spellData[key];
-        if (!spell) continue;
-        const unlocked = isSpellUnlocked(key);
-        const cost = spellCost(key);
-        const canCast = unlocked && canAffordMana(cost);
+      for (let idx = 0; idx < spellQuickslotCount; idx += 1) {
+        const key = state.quickslots[idx];
+        const spell = key ? spellData[key] : null;
+        const unlocked = spell ? isSpellUnlocked(key) : false;
+        const cost = spell ? spellCost(key) : 0;
+        const canCast = spell && unlocked && canAffordMana(cost);
 
         const slot = document.createElement("button");
         slot.type = "button";
-        slot.className = `quickslot ${state.activeSpell === key ? "active" : ""}`;
-        slot.disabled = !canCast;
+        slot.className = `quickslot ${state.activeQuickslot === idx ? "active" : ""}`;
         slot.innerHTML = `
           <span class="slot-key">${idx + 1}</span>
-          <img src="${spell.image}" alt="${spell.name} icon" />
-          <span>${spell.name}</span>
-          <span class="slot-cost">${unlocked ? format(cost) + " mana" : "Locked"}</span>
+          <img src="${spell ? spell.image : webIcon("❔")}" alt="${spell ? spell.name : "Unassigned spell slot"} icon" />
+          <span>${spell ? spell.name : "Empty Slot"}</span>
+          <span class="slot-cost">${spell ? (unlocked ? format(cost) + " mana" : `Unlock Lv ${spell.unlockLevel}`) : "Click to assign"}</span>
         `;
-        slot.title = unlocked ? `Cast ${spell.name}` : `Unlock at ${format(spell.unlockAt)} total power`;
+        slot.title = spell ? (unlocked ? `Cast ${spell.name}` : `Unlock at level ${spell.unlockLevel}`) : "Assign a spell";
         slot.addEventListener("pointerdown", (event) => {
           event.preventDefault();
-          castSpell(key);
+          state.activeQuickslot = idx;
+          openSpellSlotModal(idx);
         });
+        slot.disabled = false;
+        if (spell && !canCast) slot.classList.add("disabled");
         els.quickslots.appendChild(slot);
+      }
+    }
+
+    function openSpellSlotModal(slotIndex) {
+      activeSpellSlotPicker = slotIndex;
+      const slotLabel = slotIndex + 1;
+      els.spellSlotModalTitle.textContent = `Assign Spell to Slot ${slotLabel}`;
+      renderSpellSlotModal();
+      els.spellSlotModal.classList.remove("hidden");
+    }
+
+    function closeSpellSlotModal() {
+      els.spellSlotModal.classList.add("hidden");
+    }
+
+    function assignSpellToSlot(slotIndex, spellKey) {
+      state.quickslots[slotIndex] = spellKey;
+      state.activeQuickslot = slotIndex;
+      render();
+    }
+
+    function renderSpellSlotModal() {
+      els.spellSlotModalBody.innerHTML = "";
+
+      const clearRow = document.createElement("div");
+      clearRow.className = "item";
+      clearRow.innerHTML = `<img class="item-icon" src="${webIcon("❌")}" alt="clear slot icon" /><div><div class="name">Clear Slot</div><div class="meta">Remove assigned spell from this quickslot.</div></div><button type="button">Clear</button>`;
+      clearRow.querySelector("button").addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        assignSpellToSlot(activeSpellSlotPicker, null);
+        closeSpellSlotModal();
+      });
+      els.spellSlotModalBody.appendChild(clearRow);
+
+      for (const [key, spell] of Object.entries(spellData)) {
+        const unlocked = isSpellUnlocked(key);
+        const row = document.createElement("div");
+        row.className = "item";
+        row.innerHTML = `
+          <img class="item-icon" src="${spell.image}" alt="${spell.name} icon" />
+          <div>
+            <div class="name">${spell.name}</div>
+            <div class="meta">Level ${spell.unlockLevel} unlock • ${format(spell.basePower)} base power</div>
+            <div class="meta">Cost: ${format(spellCost(key))} mana</div>
+          </div>
+          <button type="button" ${unlocked ? "" : "disabled"}>${unlocked ? "Assign" : "Locked"}</button>
+        `;
+        row.querySelector("button").addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          if (!unlocked) return;
+          assignSpellToSlot(activeSpellSlotPicker, key);
+          closeSpellSlotModal();
+        });
+        els.spellSlotModalBody.appendChild(row);
       }
     }
 
@@ -1849,11 +1941,12 @@
       els.levelProfitBonus.textContent = `+${(state.levelBonus * 100).toFixed(0)}% profit`;
       els.levelProgressFill.style.width = `${(progress.pct * 100).toFixed(2)}%`;
       els.levelProgressText.textContent = `${format(progress.current)} / ${format(progress.needed)} power to next level`;
-      const activeSpell = spellData[state.activeSpell] || spellData.bolt;
+      const activeSpellKey = selectedSpellKey();
+      const activeSpell = activeSpellKey ? spellData[activeSpellKey] : null;
       els.powerMirror.textContent = format(state.power);
       els.manaMirror.textContent = format(state.mana);
-      els.activeSpellName.textContent = activeSpell.name;
-      els.spellPower.textContent = `+${format(spellPower(state.activeSpell))} power`;
+      els.activeSpellName.textContent = activeSpell ? activeSpell.name : "No Spell Selected";
+      els.spellPower.textContent = activeSpell ? `+${format(spellPower(activeSpellKey))} power` : "assign from quickslot";
 
       for (const btn of els.buyToggle.querySelectorAll("button")) {
         btn.classList.toggle("active", Number(btn.dataset.buy) === state.buyAmount);
@@ -1897,11 +1990,15 @@
     els.showAllUpgradesBtn.addEventListener("click", openUpgradeListModal);
     els.closeUpgradeListBtn.addEventListener("click", closeUpgradeListModal);
     els.closeGearModalBtn.addEventListener("click", closeGearModal);
+    els.closeSpellSlotModalBtn.addEventListener("click", closeSpellSlotModal);
     els.upgradeListModal.addEventListener("click", (event) => {
       if (event.target === els.upgradeListModal) closeUpgradeListModal();
     });
     els.gearModal.addEventListener("click", (event) => {
       if (event.target === els.gearModal) closeGearModal();
+    });
+    els.spellSlotModal.addEventListener("click", (event) => {
+      if (event.target === els.spellSlotModal) closeSpellSlotModal();
     });
     els.resetBtn.addEventListener("click", () => {
       if (confirm("Reset all progress?")) resetGame();
@@ -1934,9 +2031,11 @@
 
       if (event.code.startsWith("Digit")) {
         const slotNumber = Number(event.code.slice(5));
-        if (slotNumber >= 1 && slotNumber <= spellQuickslotOrder.length) {
+        if (slotNumber >= 1 && slotNumber <= spellQuickslotCount) {
           event.preventDefault();
-          castSpell(spellQuickslotOrder[slotNumber - 1]);
+          state.activeQuickslot = slotNumber - 1;
+          castSpell(state.quickslots[slotNumber - 1]);
+          render();
         }
       }
     });
