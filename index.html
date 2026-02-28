@@ -965,7 +965,7 @@
         name: `Arcane Spell ${tier}`,
         basePower: Math.floor(14 * Math.pow(1.31, tier - 1)),
         manaCost: Math.max(6, Math.floor(7 * Math.pow(1.26, tier - 1))),
-        unlockLevel: tier + 1,
+        unlockLevel: tier === 1 ? 0 : tier + 1,
         image: webIcon(spellGlyphs[idx] || "✨"),
       }];
     }));
@@ -1058,7 +1058,7 @@
       clickPower: 1,
       buyAmount: 1,
       activeQuickslot: 0,
-      quickslots: Array.from({ length: spellQuickslotCount }, () => null),
+      quickslots: ["spell1", ...Array.from({ length: spellQuickslotCount - 1 }, () => null)],
       spellCasts: 0,
       structures: Object.fromEntries(Object.keys(structureData).map((k) => [k, 0])),
       equipment: Object.fromEntries(Object.keys(gearSlotData).map((k) => [k, null])),
@@ -1499,6 +1499,9 @@
       });
       if (!Array.isArray(data.quickslots) && typeof data.activeSpell === "string" && spellData[data.activeSpell]) {
         state.quickslots[0] = data.activeSpell;
+      }
+      if (!state.quickslots.some((key) => typeof key === "string" && spellData[key])) {
+        state.quickslots[0] = "spell1";
       }
       state.spellCasts = Number(data.spellCasts || 0);
 
