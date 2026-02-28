@@ -668,7 +668,7 @@
       </h1>
       <div class="sub">Gather power, train apprentices, and automate your magical empire with a richer fantasy HUD.</div>
       <div class="row">
-        <button id="castBtn">✨ Cast <span id="activeSpellName">Arcane Bolt</span> (<span id="spellPower">+1 power</span>)</button>
+        <button id="clickBtn">🖱️ Gather Power <span id="clickGain">(+1)</span></button>
         <button id="saveBtn" class="btn-secondary">💾 Save</button>
         <button id="resetBtn" class="btn-danger">♻️ Reset</button>
       </div>
@@ -691,7 +691,8 @@
         </div>
         <div class="resource"><span>🔷 Spell Mana</span><b id="manaMirror">0</b></div>
       </div>
-      <div class="tiny">Tip: Click a quickslot to assign a learned spell. Press <strong>Space</strong> to cast your selected slot, or <strong>1-5</strong> to cast from a specific slot.</div>
+      <div class="tiny">Tip: Click a quickslot to assign a learned spell. Press <strong>1-5</strong> to cast from a specific slot. <strong>Space</strong> still casts the selected slot.</div>
+      <div class="tiny">Selected: <strong id="activeSpellName">Arcane Spell 1</strong> • Effect: <span id="spellPower">+0 power/sec</span> • Time: <span id="spellTime">ready</span></div>
     </section>
 
 
@@ -995,6 +996,7 @@
         name: `Arcane Spell ${tier}`,
         basePower: Math.floor(14 * Math.pow(1.31, tier - 1)),
         manaCost: Math.max(6, Math.floor(7 * Math.pow(1.26, tier - 1))),
+        durationSec: Math.max(6, 14 - Math.floor((tier - 1) / 6)),
         unlockLevel: tier === 1 ? 0 : tier + 1,
         image: webIcon(spellGlyphs[idx] || "✨"),
       }];
@@ -1195,6 +1197,7 @@
       activeQuickslot: 0,
       quickslots: ["spell1", ...Array.from({ length: spellQuickslotCount - 1 }, () => null)],
       spellCasts: 0,
+      activeSpells: {},
       structures: Object.fromEntries(Object.keys(structureData).map((k) => [k, 0])),
       equipment: Object.fromEntries(Object.keys(gearSlotData).map((k) => [k, null])),
       ownedGear: {},
@@ -1223,10 +1226,12 @@
       levelProgressFill: document.getElementById("levelProgressFill"),
       levelProgressText: document.getElementById("levelProgressText"),
       manaMirror: document.getElementById("manaMirror"),
+      clickGain: document.getElementById("clickGain"),
       activeSpellName: document.getElementById("activeSpellName"),
       spellPower: document.getElementById("spellPower"),
+      spellTime: document.getElementById("spellTime"),
       achievementPopups: document.getElementById("achievementPopups"),
-      castBtn: document.getElementById("castBtn"),
+      clickBtn: document.getElementById("clickBtn"),
       quickslots: document.getElementById("quickslots"),
       spellSlotModal: document.getElementById("spellSlotModal"),
       spellSlotModalTitle: document.getElementById("spellSlotModalTitle"),
@@ -1648,6 +1653,27 @@
       }, 3200);
     }
 
+    function activeSpellRemainingMs(spellKey, now = Date.now()) {
+      const entry = state.activeSpells[spellKey];
+      if (!entry) return 0;
+      return Math.max(0, Number(entry.expiresAt || 0) - now);
+    }
+
+    function cleanupExpiredSpells(now = Date.now()) {
+      for (const key of Object.keys(state.activeSpells)) {
+        if (activeSpellRemainingMs(key, now) <= 0) delete state.activeSpells[key];
+      }
+    }
+
+    function getActiveSpellPps(now = Date.now()) {
+      cleanupExpiredSpells(now);
+      let bonus = 0;
+      for (const entry of Object.values(state.activeSpells)) {
+        bonus += Number(entry.powerPerSecond || 0);
+      }
+      return bonus;
+    }
+
     function castSpell(spellKey = selectedSpellKey()) {
       const key = spellData[spellKey] ? spellKey : null;
       if (!key) return;
@@ -1655,18 +1681,30 @@
       const cost = spellCost(key);
       if (!canAffordMana(cost)) return;
 
-      const power = spellPower(key);
+      const spell = spellData[key];
+      const pps = spellPower(key);
+      const now = Date.now();
       state.mana -= cost;
-      state.power += power;
-      state.totalPower += power;
-      state.levelProgressPower += power;
+      state.activeSpells[key] = {
+        powerPerSecond: pps,
+        expiresAt: now + (spell.durationSec * 1000),
+      };
       state.spellCasts += 1;
-      grantPetXp(Math.max(1, power * 0.03));
+      grantPetXp(Math.max(1, pps * 0.02));
       state.activeQuickslot = Math.min(Math.max(0, state.activeQuickslot), spellQuickslotCount - 1);
-      applyLevelUps();
       if (state.spellCasts % 25 === 0) {
         addLog(`Arcane rhythm! ${state.spellCasts} spells cast so far.`, "warn");
       }
+      render();
+    }
+
+    function gatherPower() {
+      const gain = Math.max(1, state.clickPower);
+      state.power += gain;
+      state.totalPower += gain;
+      state.levelProgressPower += gain;
+      grantPetXp(Math.max(0.5, gain * 0.015));
+      applyLevelUps();
       render();
     }
 
@@ -1697,6 +1735,15 @@
         state.quickslots[0] = "spell1";
       }
       state.spellCasts = Number(data.spellCasts || 0);
+      state.activeSpells = {};
+      for (const [key, entry] of Object.entries(data.activeSpells || {})) {
+        if (!spellData[key]) continue;
+        const expiresAt = Number(entry?.expiresAt || 0);
+        const powerPerSecond = Number(entry?.powerPerSecond || 0);
+        if (expiresAt > Date.now() && powerPerSecond > 0) {
+          state.activeSpells[key] = { expiresAt, powerPerSecond };
+        }
+      }
 
       for (const key of Object.keys(state.structures)) {
         state.structures[key] = Number(data.structures?.[key] || 0);
@@ -2098,7 +2145,7 @@
           <span class="slot-key">${idx + 1}</span>
           <img src="${spell ? spell.image : webIcon("❔")}" alt="${spell ? spell.name : "Unassigned spell slot"} icon" />
           <span>${spell ? spell.name : "Empty Slot"}</span>
-          <span class="slot-cost">${spell ? (unlocked ? format(cost) + " mana" : `Unlock Lv ${spell.unlockLevel}`) : "Click to assign"}</span>
+          <span class="slot-cost">${spell ? (unlocked ? `${format(cost)} mana • ${activeSpellRemainingMs(key) > 0 ? `${(activeSpellRemainingMs(key) / 1000).toFixed(1)}s left` : `${spell.durationSec.toFixed(0)}s duration`}` : `Unlock Lv ${spell.unlockLevel}`) : "Click to assign"}</span>
         `;
         slot.title = spell ? (unlocked ? `Cast ${spell.name}` : `Unlock at level ${spell.unlockLevel}`) : "Assign a spell";
         slot.addEventListener("pointerdown", (event) => {
@@ -2208,8 +2255,16 @@
       const activeSpellKey = selectedSpellKey();
       const activeSpell = activeSpellKey ? spellData[activeSpellKey] : null;
       els.manaMirror.textContent = format(state.mana);
+      els.clickGain.textContent = `(+${format(Math.max(1, state.clickPower))} power)`;
       els.activeSpellName.textContent = activeSpell ? activeSpell.name : "No Spell Selected";
-      els.spellPower.textContent = activeSpell ? `+${format(spellPower(activeSpellKey))} power` : "assign from quickslot";
+      if (activeSpell) {
+        els.spellPower.textContent = `+${format(spellPower(activeSpellKey))} power/sec`;
+        const remainMs = activeSpellRemainingMs(activeSpellKey);
+        els.spellTime.textContent = remainMs > 0 ? `${(remainMs / 1000).toFixed(1)}s remaining` : `${activeSpell.durationSec.toFixed(0)}s duration`;
+      } else {
+        els.spellPower.textContent = "assign from quickslot";
+        els.spellTime.textContent = "ready";
+      }
 
       for (const btn of els.buyToggle.querySelectorAll("button")) {
         btn.classList.toggle("active", Number(btn.dataset.buy) === state.buyAmount);
@@ -2228,13 +2283,15 @@
       const now = Date.now();
       const delta = Math.min((now - state.lastTick) / 1000, 1);
       state.lastTick = now;
-      const gain = getMps() * delta;
+      const baseGain = getMps() * delta;
+      const spellGain = getActiveSpellPps(now) * delta;
+      const gain = baseGain + spellGain;
       if (gain > 0) {
         state.power += gain;
         state.totalPower += gain;
         state.levelProgressPower += gain;
-        state.mana += gain * 0.25 * getPetModifiers().manaGain;
-        grantPetXp(gain * 0.0025);
+        state.mana += baseGain * 0.25 * getPetModifiers().manaGain;
+        grantPetXp((baseGain * 0.0025) + (spellGain * 0.005));
       }
       applyLevelUps();
 
@@ -2250,7 +2307,7 @@
       render();
     });
 
-    els.castBtn.addEventListener("click", castSpell);
+    els.clickBtn.addEventListener("click", gatherPower);
     els.saveBtn.addEventListener("click", () => saveGame(true));
     els.showAllUpgradesBtn.addEventListener("click", openUpgradeListModal);
     els.closeUpgradeListBtn.addEventListener("click", closeUpgradeListModal);
