@@ -546,6 +546,61 @@
       box-shadow: 0 0 0 2px rgba(159, 67, 255, 0.65) inset;
     }
 
+    .td-grid {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 10px;
+      align-items: stretch;
+      margin-top: 10px;
+    }
+
+    .td-lane {
+      border: 1px solid rgba(115, 196, 255, 0.32);
+      border-radius: 10px;
+      padding: 10px;
+      background: linear-gradient(180deg, rgba(19, 13, 23, 0.9), rgba(8, 9, 18, 0.95));
+    }
+
+    .td-track {
+      height: 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 196, 97, 0.24);
+      background: rgba(0, 0, 0, 0.5);
+      overflow: hidden;
+      margin: 8px 0;
+    }
+
+    .td-progress {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, #3bb3ff, #9f43ff);
+      transition: width 0.12s linear;
+    }
+
+    .td-enemy {
+      margin-top: 8px;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .td-stats {
+      display: grid;
+      gap: 8px;
+    }
+
+    .td-stat {
+      border: 1px solid rgba(255, 196, 97, 0.22);
+      border-radius: 10px;
+      padding: 8px;
+      background: rgba(11, 9, 16, 0.65);
+    }
+
+    .td-stat b {
+      display: block;
+      margin-top: 2px;
+    }
+
     .equipment-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -656,6 +711,7 @@
       .game { grid-template-columns: 1fr; }
       .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .equipment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .td-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -695,6 +751,25 @@
       <div class="tiny">Selected: <strong id="activeSpellName">Arcane Spell 1</strong> • Effect: <span id="spellPower">+0 power/sec</span> • Time: <span id="spellTime">ready</span></div>
     </section>
 
+
+    <section class="panel wide">
+      <h2>🏹 Arcane Tower Defense</h2>
+      <div class="meta">Your idle wizard total power scales your tower damage. Casting spells empowers the lane with burst damage and shorter enemy freezes.</div>
+      <div class="td-grid">
+        <div class="td-lane">
+          <div class="tiny">Wave <b id="tdWave">1</b> • Breaches <b id="tdBreaches">0</b> / 5</div>
+          <div class="td-track"><span id="tdProgress" class="td-progress"></span></div>
+          <div class="tiny">Enemy HP</div>
+          <div class="td-track"><span id="tdEnemyHp" class="td-progress"></span></div>
+          <div id="tdEnemyInfo" class="td-enemy">A scouting wisp approaches...</div>
+        </div>
+        <div class="td-stats">
+          <div class="td-stat"><span class="label">Tower DPS (Idle Wizard scaled)</span><b id="tdDps">0</b></div>
+          <div class="td-stat"><span class="label">Spell Pressure Bonus</span><b id="tdSpellBonus">x1.00</b></div>
+          <div class="td-stat"><span class="label">Current Reward</span><b id="tdReward">0 power / 0 mana</b></div>
+        </div>
+      </div>
+    </section>
 
     <section class="panel wide">
       <h2>⚔️ Spell Quickslots</h2>
@@ -1003,6 +1078,7 @@
     }));
 
     const spellQuickslotCount = 5;
+    const tdMaxBreaches = 5;
 
     const petData = {
       emberFox: {
@@ -1214,6 +1290,15 @@
       log: [{ text: "Welcome, wizard. Your tower awaits.", klass: "" }],
       playerLevel: 1,
       levelBonus: 0,
+      towerDefense: {
+        wave: 1,
+        breaches: 0,
+        enemyHp: 20,
+        enemyMaxHp: 20,
+        enemyProgress: 0,
+        spellPressure: 0,
+        spellFreezeSec: 0,
+      },
     };
 
     const els = {
@@ -1233,6 +1318,14 @@
       achievementPopups: document.getElementById("achievementPopups"),
       clickBtn: document.getElementById("clickBtn"),
       quickslots: document.getElementById("quickslots"),
+      tdWave: document.getElementById("tdWave"),
+      tdBreaches: document.getElementById("tdBreaches"),
+      tdProgress: document.getElementById("tdProgress"),
+      tdEnemyHp: document.getElementById("tdEnemyHp"),
+      tdEnemyInfo: document.getElementById("tdEnemyInfo"),
+      tdDps: document.getElementById("tdDps"),
+      tdSpellBonus: document.getElementById("tdSpellBonus"),
+      tdReward: document.getElementById("tdReward"),
       spellSlotModal: document.getElementById("spellSlotModal"),
       spellSlotModalTitle: document.getElementById("spellSlotModalTitle"),
       spellSlotModalBody: document.getElementById("spellSlotModalBody"),
@@ -1547,6 +1640,49 @@
       return state.quickslots[state.activeQuickslot] || null;
     }
 
+    function tdTowerDps() {
+      const totalPowerScale = Math.pow(Math.max(1, state.totalPower), 0.22);
+      const structureScale = 1 + (Object.values(state.structures).reduce((sum, amount) => sum + amount, 0) * 0.02);
+      const spellScale = 1 + Math.min(2.5, state.towerDefense.spellPressure * 0.2);
+      return totalPowerScale * structureScale * spellScale;
+    }
+
+    function tdWaveValue(wave = state.towerDefense.wave) {
+      return 18 + (wave * 5);
+    }
+
+    function spawnTdEnemy(nextWave = state.towerDefense.wave) {
+      const hp = tdWaveValue(nextWave) * Math.pow(1.2, Math.max(0, nextWave - 1));
+      state.towerDefense.enemyMaxHp = hp;
+      state.towerDefense.enemyHp = hp;
+      state.towerDefense.enemyProgress = 0;
+    }
+
+    function updateTowerDefense(delta) {
+      if (state.towerDefense.breaches >= tdMaxBreaches) return;
+      if (state.towerDefense.spellFreezeSec > 0) {
+        state.towerDefense.spellFreezeSec = Math.max(0, state.towerDefense.spellFreezeSec - delta);
+      }
+      const speed = (0.025 + (state.towerDefense.wave * 0.0035)) * (state.towerDefense.spellFreezeSec > 0 ? 0.2 : 1);
+      state.towerDefense.enemyProgress += speed * delta;
+      state.towerDefense.enemyHp -= tdTowerDps() * delta;
+
+      if (state.towerDefense.enemyHp <= 0) {
+        const rewardPower = state.towerDefense.enemyMaxHp * 1.6;
+        const rewardMana = Math.max(1, state.towerDefense.wave * 1.15);
+        state.power += rewardPower;
+        state.totalPower += rewardPower;
+        state.levelProgressPower += rewardPower;
+        state.mana += rewardMana;
+        state.towerDefense.wave += 1;
+        spawnTdEnemy(state.towerDefense.wave);
+      } else if (state.towerDefense.enemyProgress >= 1) {
+        state.towerDefense.breaches += 1;
+        state.towerDefense.spellPressure = Math.max(0, state.towerDefense.spellPressure - 0.6);
+        spawnTdEnemy(state.towerDefense.wave);
+      }
+    }
+
     function canAfford(cost) {
       return state.power >= cost;
     }
@@ -1690,6 +1826,9 @@
         expiresAt: now + (spell.durationSec * 1000),
       };
       state.spellCasts += 1;
+      state.towerDefense.spellPressure = Math.min(12, state.towerDefense.spellPressure + 0.55);
+      state.towerDefense.spellFreezeSec = Math.max(state.towerDefense.spellFreezeSec, 0.35 + (pps / Math.max(1, state.towerDefense.enemyMaxHp)));
+      state.towerDefense.enemyHp = Math.max(0, state.towerDefense.enemyHp - (pps * 0.9));
       grantPetXp(Math.max(1, pps * 0.02));
       state.activeQuickslot = Math.min(Math.max(0, state.activeQuickslot), spellQuickslotCount - 1);
       if (state.spellCasts % 25 === 0) {
@@ -1808,6 +1947,16 @@
         state.levelProgressPower = estimated.progressPower;
       }
       state.levelBonus = Number.isFinite(data.levelBonus) ? Number(data.levelBonus) : (state.playerLevel - 1) * 0.05;
+      const loadedTd = data.towerDefense || {};
+      state.towerDefense = {
+        wave: Math.max(1, Math.floor(Number(loadedTd.wave || 1))),
+        breaches: Math.max(0, Math.floor(Number(loadedTd.breaches || 0))),
+        enemyHp: Math.max(1, Number(loadedTd.enemyHp || tdWaveValue(Number(loadedTd.wave || 1)))),
+        enemyMaxHp: Math.max(1, Number(loadedTd.enemyMaxHp || tdWaveValue(Number(loadedTd.wave || 1)))),
+        enemyProgress: Math.min(1, Math.max(0, Number(loadedTd.enemyProgress || 0))),
+        spellPressure: Math.max(0, Number(loadedTd.spellPressure || 0)),
+        spellFreezeSec: Math.max(0, Number(loadedTd.spellFreezeSec || 0)),
+      };
 
       state.log = Array.isArray(data.log) && data.log.length
         ? data.log.map((entry) => (typeof entry === "string" ? { text: entry, klass: "" } : entry))
@@ -2238,6 +2387,26 @@
         .join("");
     }
 
+    function renderTowerDefense() {
+      const td = state.towerDefense;
+      const hpPct = Math.max(0, Math.min(100, (td.enemyHp / Math.max(1, td.enemyMaxHp)) * 100));
+      const progressPct = Math.max(0, Math.min(100, td.enemyProgress * 100));
+      const rewardPower = td.enemyMaxHp * 1.6;
+      const rewardMana = Math.max(1, td.wave * 1.15);
+      els.tdWave.textContent = String(td.wave);
+      els.tdBreaches.textContent = String(td.breaches);
+      els.tdProgress.style.width = `${progressPct.toFixed(2)}%`;
+      els.tdEnemyHp.style.width = `${hpPct.toFixed(2)}%`;
+      if (td.breaches >= tdMaxBreaches) {
+        els.tdEnemyInfo.textContent = "The barrier is overloaded (5 breaches). Keep casting and growing power, then refresh to restart this lane.";
+      } else {
+        els.tdEnemyInfo.textContent = `Wave ${td.wave} invader • ${format(td.enemyHp)} / ${format(td.enemyMaxHp)} HP • ${(progressPct).toFixed(0)}% to breach${td.spellFreezeSec > 0 ? ` • Frozen ${td.spellFreezeSec.toFixed(1)}s` : ""}`;
+      }
+      els.tdDps.textContent = `${format(tdTowerDps())} damage/sec`;
+      els.tdSpellBonus.textContent = `x${(1 + Math.min(2.5, td.spellPressure * 0.2)).toFixed(2)}`;
+      els.tdReward.textContent = `${format(rewardPower)} power / ${format(rewardMana)} mana`;
+    }
+
     function render() {
       const mps = getMps();
       els.power.textContent = format(state.power);
@@ -2275,6 +2444,7 @@
       renderPets();
       renderUpgrades();
       renderQuickslots();
+      renderTowerDefense();
       renderAchievements();
       renderLog();
     }
@@ -2286,6 +2456,8 @@
       const baseGain = getMps() * delta;
       const spellGain = getActiveSpellPps(now) * delta;
       const gain = baseGain + spellGain;
+      state.towerDefense.spellPressure = Math.max(0, state.towerDefense.spellPressure - (delta * 0.075));
+      updateTowerDefense(delta);
       if (gain > 0) {
         state.power += gain;
         state.totalPower += gain;
