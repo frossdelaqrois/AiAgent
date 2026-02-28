@@ -28,7 +28,7 @@ export function renderUI(state, refs, actions, computed) {
     const cooldownPct = ready ? 100 : Math.max(0, 100 - (remain / s.cooldown) * 100);
     const row = document.createElement('div');
     row.className = 'spell';
-    row.innerHTML = `<strong>${s.name}</strong><div class="tooltip">${s.type} spell</div><button ${ready ? '' : 'disabled'}>${ready ? 'Cast' : `${remain.toFixed(1)}s`}</button><div class="cooldown"><span style="width:${cooldownPct}%"></span></div>`;
+    row.innerHTML = `<strong>${s.name}</strong><div class="tooltip">${s.school} • ${s.description}</div><button ${ready ? '' : 'disabled'}>${ready ? 'Cast' : `${remain.toFixed(1)}s`}</button><div class="cooldown"><span style="width:${cooldownPct}%"></span></div>`;
     row.querySelector('button').onclick = () => actions.castSpell(s.id);
     refs.spells.appendChild(row);
   }
