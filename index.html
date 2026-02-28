@@ -660,9 +660,9 @@
     }
 
     .td-tower-icon {
-      right: 8%;
+      left: 90%;
       top: 81%;
-      transform: translate(50%, -50%);
+      transform: translate(-50%, -50%);
     }
 
     .td-enemy-unit {
@@ -725,7 +725,7 @@
       width: 100%;
       height: 100%;
       display: block;
-      pointer-events: none;
+      pointer-events: auto;
       z-index: 2;
     }
 
@@ -951,6 +951,11 @@
           <div class="tiny">Wave <b id="tdWave">1</b> • Breaches <b id="tdBreaches">0</b> / 5</div>
           <div class="td-battlefield">
             <canvas id="tdWebglCanvas" class="td-webgl-canvas" aria-label="Tower defense battlefield (WebGL)"></canvas>
+            <div id="tdTowerIcon" class="td-tower-icon" aria-hidden="true">🏰</div>
+            <div id="tdEnemyUnit" class="td-enemy-unit" aria-hidden="true">
+              <span class="td-enemy-icon">👾</span>
+              <span class="td-enemy-health"><span id="tdEnemyHealthFill"></span></span>
+            </div>
             <span id="tdDamageLayer" class="td-damage-layer"></span>
           </div>
           <div class="tiny" id="tdDistance">Distance to gate: 100%</div>
@@ -1523,6 +1528,9 @@
       tdSpellBonus: document.getElementById("tdSpellBonus"),
       tdReward: document.getElementById("tdReward"),
       tdWebglCanvas: document.getElementById("tdWebglCanvas"),
+      tdTowerIcon: document.getElementById("tdTowerIcon"),
+      tdEnemyUnit: document.getElementById("tdEnemyUnit"),
+      tdEnemyHealthFill: document.getElementById("tdEnemyHealthFill"),
       tdDamageLayer: document.getElementById("tdDamageLayer"),
       tdPowerWarning: document.getElementById("tdPowerWarning"),
       spellSlotModal: document.getElementById("spellSlotModal"),
@@ -1595,9 +1603,50 @@
       gl.enableVertexAttribArray(positionLocation);
       gl.vertexAttribPointer(positionLocation, 3, gl.FLOAT, false, 0, 0);
       gl.enable(gl.DEPTH_TEST);
-      gl.enable(gl.CULL_FACE);
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+      const cameraState = {
+        target: [0.1, -0.14, 0.12],
+        yaw: -0.05,
+        pitch: -0.71,
+        distance: 2.75,
+        rotating: false,
+        pointerId: null,
+        lastX: 0,
+        lastY: 0,
+      };
+
+      canvas.addEventListener("contextmenu", (event) => event.preventDefault());
+      canvas.addEventListener("pointerdown", (event) => {
+        if (event.button !== 2) return;
+        event.preventDefault();
+        cameraState.rotating = true;
+        cameraState.pointerId = event.pointerId;
+        cameraState.lastX = event.clientX;
+        cameraState.lastY = event.clientY;
+        canvas.setPointerCapture(event.pointerId);
+      });
+      canvas.addEventListener("pointermove", (event) => {
+        if (!cameraState.rotating || event.pointerId !== cameraState.pointerId) return;
+        event.preventDefault();
+        const deltaX = event.clientX - cameraState.lastX;
+        const deltaY = event.clientY - cameraState.lastY;
+        cameraState.lastX = event.clientX;
+        cameraState.lastY = event.clientY;
+        cameraState.yaw += deltaX * 0.008;
+        cameraState.pitch = Math.max(-1.2, Math.min(-0.15, cameraState.pitch + (deltaY * 0.006)));
+      });
+      const endCameraRotate = (event) => {
+        if (event.pointerId !== cameraState.pointerId) return;
+        cameraState.rotating = false;
+        cameraState.pointerId = null;
+        if (canvas.hasPointerCapture(event.pointerId)) {
+          canvas.releasePointerCapture(event.pointerId);
+        }
+      };
+      canvas.addEventListener("pointerup", endCameraRotate);
+      canvas.addEventListener("pointercancel", endCameraRotate);
 
       function resizeCanvas() {
         const width = Math.max(1, Math.floor(canvas.clientWidth * window.devicePixelRatio));
@@ -1775,8 +1824,18 @@
         gl.clearColor(0.04, 0.05, 0.09, 1);
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-        const proj = perspective(Math.PI / 3.2, canvas.width / canvas.height, 0.1, 12);
-        const view = lookAt([0, 1.65, 2.2], [0.1, -0.14, 0.12], [0, 1, 0]);
+        const proj = perspective(Math.PI / 3.2, canvas.width / canvas.height, 0.1, 16);
+        if (!Number.isFinite(cameraState.yaw) || !Number.isFinite(cameraState.pitch)) {
+          cameraState.yaw = -0.05;
+          cameraState.pitch = -0.71;
+        }
+        const target = cameraState.target;
+        const eye = [
+          target[0] + (Math.cos(cameraState.pitch) * Math.sin(cameraState.yaw) * cameraState.distance),
+          target[1] - (Math.sin(cameraState.pitch) * cameraState.distance),
+          target[2] + (Math.cos(cameraState.pitch) * Math.cos(cameraState.yaw) * cameraState.distance),
+        ];
+        const view = lookAt(eye, target, [0, 1, 0]);
         const camera = multiplyMat4(proj, view);
 
         drawTriangles(boxVertices([0, -0.28, 0], [2.3, 0.18, 2.3]), [0.16, 0.42, 0.2, 1], camera);
@@ -1791,11 +1850,13 @@
         }
 
         const gate = pctToWorld({ x: 84, y: 77 });
+        drawTriangles(boxVertices([gate.x, 0.04, gate.z], [0.3, 0.34, 0.3]), [0.43, 0.32, 0.82, 1], camera);
+        drawTriangles(boxVertices([gate.x, 0.24, gate.z], [0.14, 0.22, 0.14]), [0.62, 0.51, 0.95, 1], camera);
         drawTriangles(boxVertices([gate.x, -0.05, gate.z], [0.24, 0.22, 0.24]), [0.32, 0.27, 0.66, 1], camera);
-        drawTriangles(sphereVertices([gate.x, 0.12, gate.z], 0.08, 9, 7), [0.55, 0.71, 1, 0.95], camera);
+        drawTriangles(sphereVertices([gate.x, 0.39, gate.z], 0.08, 9, 7), [0.55, 0.71, 1, 0.95], camera);
 
         const enemy = pctToWorld(scene.enemyPosition);
-        drawTriangles(sphereVertices([enemy.x, -0.03, enemy.z], 0.09, 12, 9), [0.78, 0.22, 0.2, 1], camera);
+        drawTriangles(sphereVertices([enemy.x, 0.02, enemy.z], 0.11, 14, 10), [0.95, 0.31, 0.25, 1], camera);
 
         if (scene.freezeSec > 0) {
           drawTriangles(sphereVertices([enemy.x, -0.03, enemy.z], 0.15, 10, 8), [0.55, 0.82, 1, 0.3], camera);
@@ -2983,6 +3044,11 @@
       els.tdWave.textContent = String(td.wave);
       els.tdBreaches.textContent = String(td.breaches);
       els.tdDistance.textContent = `Distance to gate: ${(100 - progressPct).toFixed(0)}% • HP ${(hpPct).toFixed(0)}%`;
+      els.tdTowerIcon.style.left = `${tdTowerPosition().x.toFixed(2)}%`;
+      els.tdTowerIcon.style.top = `${tdTowerPosition().y.toFixed(2)}%`;
+      els.tdEnemyUnit.style.left = `${enemyPos.x.toFixed(2)}%`;
+      els.tdEnemyUnit.style.top = `${enemyPos.y.toFixed(2)}%`;
+      els.tdEnemyHealthFill.style.width = `${hpPct.toFixed(2)}%`;
       tdRenderer.render({
         enemyProgress: td.enemyProgress,
         enemyPosition: enemyPos,
