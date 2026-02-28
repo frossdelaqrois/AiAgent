@@ -140,6 +140,12 @@
       margin-top: 8px;
     }
 
+    .upgrade-grid {
+      grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+      gap: 12px;
+      align-items: start;
+    }
+
     .item {
       display: grid;
       grid-template-columns: auto 1fr auto;
@@ -159,6 +165,84 @@
       object-fit: cover;
       background: rgba(0, 0, 0, 0.35);
       box-shadow: 0 0 12px rgba(143, 67, 255, 0.4);
+    }
+
+    .upgrade-icon {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 196, 97, 0.4);
+      background: linear-gradient(180deg, rgba(18, 13, 9, 0.95), rgba(43, 28, 16, 0.8));
+      padding: 8px;
+      min-height: 86px;
+      cursor: pointer;
+      transition: transform 0.12s ease, border-color 0.12s ease;
+    }
+
+    .upgrade-icon:hover,
+    .upgrade-icon:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(255, 216, 147, 0.9);
+      outline: none;
+    }
+
+    .upgrade-icon.disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .upgrade-icon .item-icon {
+      width: 56px;
+      height: 56px;
+      margin: 0;
+    }
+
+    .upgrade-tooltip {
+      position: absolute;
+      left: 50%;
+      bottom: calc(100% + 10px);
+      transform: translateX(-50%) translateY(4px);
+      width: min(240px, 70vw);
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 216, 147, 0.55);
+      background: rgba(11, 8, 6, 0.97);
+      color: #ffe7bf;
+      font-size: 0.78rem;
+      line-height: 1.35;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.12s ease, transform 0.12s ease;
+      z-index: 12;
+      text-align: left;
+    }
+
+    .upgrade-tooltip b {
+      display: block;
+      margin-bottom: 4px;
+      color: #fff6e0;
+      font-size: 0.82rem;
+    }
+
+    .upgrade-icon:hover .upgrade-tooltip,
+    .upgrade-icon:focus-visible .upgrade-tooltip {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .upgrade-empty {
+      color: var(--muted);
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px dashed rgba(255, 196, 97, 0.35);
+      background: rgba(0, 0, 0, 0.2);
+      text-align: center;
+      font-size: 0.9rem;
     }
 
     .name { font-weight: 700; }
@@ -406,7 +490,7 @@
 
     <section class="panel">
       <h2>🔮 Upgrades</h2>
-      <div id="upgrades" class="shop scroll-shop"></div>
+      <div id="upgrades" class="shop scroll-shop upgrade-grid"></div>
     </section>
 
     <section class="panel">
@@ -986,30 +1070,54 @@
 
     function renderUpgrades() {
       els.upgrades.innerHTML = "";
+      let visibleUpgrades = 0;
       for (const [key, up] of Object.entries(upgradeData)) {
         const level = upgradeLevel(key);
-        const maxed = !up.repeatable && level > 0;
+        const maxed = level > 0;
+        if (maxed) continue;
+
+        visibleUpgrades += 1;
         const requirementMet = meetsUpgradeRequirement(key);
         const nextCost = getUpgradeCost(key);
-        const disabled = maxed || !requirementMet || !canAfford(nextCost);
+        const disabled = !requirementMet || !canAfford(nextCost);
         const card = document.createElement("div");
-        card.className = "item";
+        card.className = `upgrade-icon${disabled ? " disabled" : ""}`;
+        card.tabIndex = 0;
+        card.setAttribute("role", "button");
+        card.setAttribute("aria-label", `Buy upgrade ${up.name}`);
         card.innerHTML = `
-          <img class="item-icon" src="${up.image}" alt="${up.name} icon" title="${up.tooltip}" />
-          <div>
-            <div class="name">${up.name} <span class="pill">${up.school || "Arcane"}</span>${level > 0 ? `<span class="pill">Lv ${level}</span>` : ""}${maxed ? '<span class="pill">Learned</span>' : ""}</div>
-            <div class="meta">${up.effect} • Cost: ${Number.isFinite(nextCost) ? format(nextCost) : "--"} power</div>
-            ${up.requirementText ? `<div class="meta">Req: ${up.requirementText}${requirementMet ? "" : " (not met)"}</div>` : ""}
+          <img class="item-icon" src="${up.image}" alt="${up.name} icon" />
+          <div class="upgrade-tooltip">
+            <b>${up.name}</b>
+            <div>${up.effect}</div>
+            <div>Cost: ${Number.isFinite(nextCost) ? format(nextCost) : "--"} power</div>
+            ${up.requirementText ? `<div>Req: ${up.requirementText}${requirementMet ? "" : " (not met)"}</div>` : ""}
+            <div>${up.tooltip}</div>
           </div>
-          <button ${disabled ? "disabled" : ""}>${maxed ? "Done" : up.repeatable ? "Study" : "Research"}</button>
         `;
-        const upgradeButton = card.querySelector("button");
-        upgradeButton.addEventListener("pointerdown", (event) => {
+
+        card.addEventListener("pointerdown", (event) => {
           event.preventDefault();
           event.stopPropagation();
+          if (disabled) return;
           buyUpgrade(key);
         });
+
+        card.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          if (disabled) return;
+          buyUpgrade(key);
+        });
+
         els.upgrades.appendChild(card);
+      }
+
+      if (visibleUpgrades === 0) {
+        const empty = document.createElement("div");
+        empty.className = "upgrade-empty";
+        empty.textContent = "All upgrades in this run have been learned.";
+        els.upgrades.appendChild(empty);
       }
     }
 
