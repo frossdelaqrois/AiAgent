@@ -1323,6 +1323,7 @@
 
     function spellCost(key) {
       const base = spellData[key].manaCost;
+      if (spellData[key].unlockLevel === 0) return 0;
       const reduction = hasUpgrade("manaCompression") ? 0.8 : 1;
       const singularityDiscount = hasUpgrade("singularityCore") ? 0.75 : 1;
       const masteryDiscount = state.achievements.spellweaver ? 0.9 : 1;
