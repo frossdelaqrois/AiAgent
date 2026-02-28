@@ -650,38 +650,18 @@
       filter: hue-rotate(-25deg) saturate(1.2);
     }
 
-    .td-tower-icon,
-    .td-enemy-icon {
-      position: absolute;
-      transform: translate(-50%, -50%);
-      font-size: 2.6rem;
-      filter: drop-shadow(0 0 7px rgba(0, 0, 0, 0.55));
-      z-index: 2;
-    }
-
-    .td-tower-icon {
-      left: 90%;
-      top: 81%;
-      transform: translate(-50%, -50%);
-    }
-
     .td-enemy-unit {
       position: absolute;
       left: 14%;
       top: 16%;
-      width: 56px;
+      width: 68px;
       display: grid;
       justify-items: center;
       gap: 4px;
-      transform: translate(-50%, -100%);
+      transform: translate(-50%, -132%);
       transition: left 0.12s linear, top 0.12s linear;
       z-index: 3;
       pointer-events: none;
-    }
-
-    .td-enemy-icon {
-      position: static;
-      transform: none;
     }
 
     .td-enemy-health {
@@ -951,9 +931,7 @@
           <div class="tiny">Wave <b id="tdWave">1</b> • Breaches <b id="tdBreaches">0</b> / 5</div>
           <div class="td-battlefield">
             <canvas id="tdWebglCanvas" class="td-webgl-canvas" aria-label="Tower defense battlefield (WebGL)"></canvas>
-            <div id="tdTowerIcon" class="td-tower-icon" aria-hidden="true">🏰</div>
             <div id="tdEnemyUnit" class="td-enemy-unit" aria-hidden="true">
-              <span class="td-enemy-icon">👾</span>
               <span class="td-enemy-health"><span id="tdEnemyHealthFill"></span></span>
             </div>
             <span id="tdDamageLayer" class="td-damage-layer"></span>
@@ -1528,7 +1506,6 @@
       tdSpellBonus: document.getElementById("tdSpellBonus"),
       tdReward: document.getElementById("tdReward"),
       tdWebglCanvas: document.getElementById("tdWebglCanvas"),
-      tdTowerIcon: document.getElementById("tdTowerIcon"),
       tdEnemyUnit: document.getElementById("tdEnemyUnit"),
       tdEnemyHealthFill: document.getElementById("tdEnemyHealthFill"),
       tdDamageLayer: document.getElementById("tdDamageLayer"),
@@ -1719,14 +1696,15 @@
 
       function multiplyMat4(a, b) {
         const out = new Float32Array(16);
-        for (let row = 0; row < 4; row += 1) {
-          for (let col = 0; col < 4; col += 1) {
-            out[(row * 4) + col] =
-              (a[(row * 4) + 0] * b[col + 0]) +
-              (a[(row * 4) + 1] * b[col + 4]) +
-              (a[(row * 4) + 2] * b[col + 8]) +
-              (a[(row * 4) + 3] * b[col + 12]);
-          }
+        for (let i = 0; i < 4; i += 1) {
+          const ai0 = a[i];
+          const ai1 = a[i + 4];
+          const ai2 = a[i + 8];
+          const ai3 = a[i + 12];
+          out[i] = (ai0 * b[0]) + (ai1 * b[1]) + (ai2 * b[2]) + (ai3 * b[3]);
+          out[i + 4] = (ai0 * b[4]) + (ai1 * b[5]) + (ai2 * b[6]) + (ai3 * b[7]);
+          out[i + 8] = (ai0 * b[8]) + (ai1 * b[9]) + (ai2 * b[10]) + (ai3 * b[11]);
+          out[i + 12] = (ai0 * b[12]) + (ai1 * b[13]) + (ai2 * b[14]) + (ai3 * b[15]);
         }
         return out;
       }
@@ -1849,14 +1827,21 @@
           drawTriangles(segmentPrism(progressPath[i], progressPath[i + 1], 0.12, 0.08), [0.98, 0.9, 0.7, 0.95], camera);
         }
 
-        const gate = pctToWorld({ x: 84, y: 77 });
-        drawTriangles(boxVertices([gate.x, 0.04, gate.z], [0.3, 0.34, 0.3]), [0.43, 0.32, 0.82, 1], camera);
-        drawTriangles(boxVertices([gate.x, 0.24, gate.z], [0.14, 0.22, 0.14]), [0.62, 0.51, 0.95, 1], camera);
-        drawTriangles(boxVertices([gate.x, -0.05, gate.z], [0.24, 0.22, 0.24]), [0.32, 0.27, 0.66, 1], camera);
-        drawTriangles(sphereVertices([gate.x, 0.39, gate.z], 0.08, 9, 7), [0.55, 0.71, 1, 0.95], camera);
+        const tower = pctToWorld({ x: 84, y: 77 });
+        drawTriangles(boxVertices([tower.x, -0.07, tower.z], [0.34, 0.18, 0.34]), [0.33, 0.28, 0.68, 1], camera);
+        drawTriangles(boxVertices([tower.x, 0.11, tower.z], [0.24, 0.38, 0.24]), [0.43, 0.32, 0.82, 1], camera);
+        drawTriangles(boxVertices([tower.x, 0.34, tower.z], [0.29, 0.12, 0.29]), [0.54, 0.44, 0.9, 1], camera);
+        drawTriangles(boxVertices([tower.x + 0.11, 0.41, tower.z + 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
+        drawTriangles(boxVertices([tower.x - 0.11, 0.41, tower.z + 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
+        drawTriangles(boxVertices([tower.x + 0.11, 0.41, tower.z - 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
+        drawTriangles(boxVertices([tower.x - 0.11, 0.41, tower.z - 0.11], [0.07, 0.08, 0.07]), [0.48, 0.39, 0.84, 1], camera);
+        drawTriangles(sphereVertices([tower.x, 0.48, tower.z], 0.085, 10, 8), [0.55, 0.71, 1, 0.95], camera);
 
         const enemy = pctToWorld(scene.enemyPosition);
-        drawTriangles(sphereVertices([enemy.x, 0.02, enemy.z], 0.11, 14, 10), [0.95, 0.31, 0.25, 1], camera);
+        drawTriangles(sphereVertices([enemy.x, 0.01, enemy.z], 0.1, 14, 10), [0.95, 0.31, 0.25, 1], camera);
+        drawTriangles(sphereVertices([enemy.x, 0.13, enemy.z], 0.06, 12, 8), [1, 0.47, 0.36, 1], camera);
+        drawTriangles(boxVertices([enemy.x - 0.045, -0.09, enemy.z], [0.04, 0.1, 0.04]), [0.73, 0.2, 0.17, 1], camera);
+        drawTriangles(boxVertices([enemy.x + 0.045, -0.09, enemy.z], [0.04, 0.1, 0.04]), [0.73, 0.2, 0.17, 1], camera);
 
         if (scene.freezeSec > 0) {
           drawTriangles(sphereVertices([enemy.x, -0.03, enemy.z], 0.15, 10, 8), [0.55, 0.82, 1, 0.3], camera);
@@ -3044,8 +3029,6 @@
       els.tdWave.textContent = String(td.wave);
       els.tdBreaches.textContent = String(td.breaches);
       els.tdDistance.textContent = `Distance to gate: ${(100 - progressPct).toFixed(0)}% • HP ${(hpPct).toFixed(0)}%`;
-      els.tdTowerIcon.style.left = `${tdTowerPosition().x.toFixed(2)}%`;
-      els.tdTowerIcon.style.top = `${tdTowerPosition().y.toFixed(2)}%`;
       els.tdEnemyUnit.style.left = `${enemyPos.x.toFixed(2)}%`;
       els.tdEnemyUnit.style.top = `${enemyPos.y.toFixed(2)}%`;
       els.tdEnemyHealthFill.style.width = `${hpPct.toFixed(2)}%`;
