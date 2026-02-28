@@ -189,7 +189,6 @@
     }
 
     .upgrade-icon.disabled {
-      opacity: 0.5;
       cursor: not-allowed;
     }
 
@@ -759,6 +758,7 @@
       spellCasts: 0,
       structures: Object.fromEntries(Object.keys(structureData).map((k) => [k, 0])),
       upgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, 0])),
+      revealedUpgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, false])),
       achievements: Object.fromEntries(achievementData.map((a) => [a.key, false])),
       lastTick: Date.now(),
       lastSavedAt: null,
@@ -1042,6 +1042,9 @@
         const loaded = data.upgrades?.[key];
         state.upgrades[key] = loaded === true ? 1 : Number(loaded || 0);
       }
+      for (const key of Object.keys(state.revealedUpgrades)) {
+        state.revealedUpgrades[key] = Boolean(data.revealedUpgrades?.[key]) || state.upgrades[key] > 0;
+      }
       previousUpgradeRenderKey = "";
       for (const key of Object.keys(state.achievements)) {
         state.achievements[key] = Boolean(data.achievements?.[key]);
@@ -1123,7 +1126,11 @@
         const nextCost = getUpgradeCost(key);
         const requirementMet = meetsUpgradeRequirement(key);
         const canReveal = Number.isFinite(nextCost) && state.power >= nextCost * 0.5;
-        if (level > 0 || !requirementMet || !canReveal) continue;
+        const alreadyRevealed = Boolean(state.revealedUpgrades[key]) || level > 0;
+        if (!alreadyRevealed && requirementMet && canReveal) {
+          state.revealedUpgrades[key] = true;
+        }
+        if (level > 0 || !requirementMet || (!state.revealedUpgrades[key] && !canReveal)) continue;
         visibleEntries.push({ key, up, nextCost, requirementMet });
       }
 
