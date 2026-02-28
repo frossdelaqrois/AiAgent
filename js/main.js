@@ -1,6 +1,6 @@
 import { createInitialState } from './gameState.js';
 import { productionPerSecond, formatNumber, upgradeDefs } from './economy.js';
-import { generatorDefs, initializeGenerators } from './generators.js';
+import { generatorDefs } from './generators.js';
 import { spellDefs, isSpellReady } from './spells.js';
 import { canAscend, performAscension } from './prestige.js';
 import { renderUI } from './uiRenderer.js';
@@ -10,7 +10,13 @@ import { preloadAssets } from './assetLoader.js';
 import { createAudioManager } from './audioManager.js';
 
 let state = loadGame() || createInitialState();
-initializeGenerators(state);
+for (const g of generatorDefs) {
+  if (typeof state.generators[g.id] !== 'number') state.generators[g.id] = 0;
+}
+state.spells = state.spells || {};
+state.spells.eternalEmbersStacks = state.spells.eternalEmbersStacks || 0;
+state.spells.lastSpellCastAt = state.spells.lastSpellCastAt || 0;
+
 const audio = createAudioManager();
 audio.setMuted(true);
 
@@ -45,7 +51,61 @@ preloadAssets(assets).then(() => {
   refs.wizardImage.src = 'assets/characters/wizard.svg';
 });
 
-const boosts = { production: 1, speed: 1, autoClick: 0, expiresAt: 0 };
+const activeSpells = {};
+const manaHistory = [];
+const boosts = { speed: 1, spellPower: 1 };
+
+function countActiveSpells(now = Date.now()) {
+  return Object.values(activeSpells).filter((entry) => entry.expiresAt > now).length;
+}
+
+function getLeylineMultiplier() {
+  let weightedBase = 0;
+  let weightedScaled = 0;
+  for (const g of generatorDefs) {
+    const owned = state.generators[g.id] || 0;
+    const base = owned * g.production;
+    weightedBase += base;
+    weightedScaled += base * (1 + activeSpells['leyline-saturation'].perBuilding * owned);
+  }
+  if (weightedBase <= 0) return 1;
+  return weightedScaled / weightedBase;
+}
+
+function totalProductionMultiplier(now) {
+  let mult = 1;
+  const compound = activeSpells['arcane-compound-interest'];
+  if (compound && compound.expiresAt > now) mult *= compound.mult;
+  const taxation = activeSpells['void-taxation'];
+  if (taxation && taxation.expiresAt > now) mult *= taxation.mult;
+  const leyline = activeSpells['leyline-saturation'];
+  if (leyline && leyline.expiresAt > now) mult *= getLeylineMultiplier();
+  const overload = activeSpells['runic-overload'];
+  if (overload && overload.expiresAt > now) {
+    const activeCount = Math.max(0, countActiveSpells(now) - 1);
+    mult *= 1 + overload.perSpell * activeCount;
+  }
+  const reflection = activeSpells['infinite-reflection'];
+  if (reflection && reflection.expiresAt > now) mult *= 1 + reflection.bonusPct;
+  if (state.spells.eternalEmbersStacks > 0) mult *= 1 + state.spells.eternalEmbersStacks;
+  return mult;
+}
+
+function getSpellPowerMultiplier(now, baseMps) {
+  let mult = boosts.spellPower;
+  const arbitrage = activeSpells['dimensional-arbitrage'];
+  if (arbitrage && arbitrage.expiresAt > now) {
+    mult *= 1 + Math.log10(baseMps + 10) * arbitrage.conversion;
+  }
+  return mult;
+}
+
+function pushManaHistory(now, gain) {
+  manaHistory.push({ now, gain });
+  while (manaHistory.length && now - manaHistory[0].now > 12000) {
+    manaHistory.shift();
+  }
+}
 
 function applyOfflineProgress() {
   const mps = productionPerSecond(state, 1);
@@ -59,7 +119,7 @@ function applyOfflineProgress() {
 }
 
 function castManual() {
-  const gain = 1 + Math.sqrt(state.arcaneKnowledge + 1) + boosts.autoClick;
+  const gain = 1 + Math.sqrt(state.arcaneKnowledge + 1);
   state.mana += gain;
   state.lifetimeMana += gain;
   state.totalClicks += 1;
@@ -70,19 +130,92 @@ function castSpell(id) {
   const spell = spellDefs.find((s) => s.id === id);
   if (!spell || !isSpellReady(state, id)) return;
   const now = Date.now();
+  const baseMps = productionPerSecond(state, totalProductionMultiplier(now));
+  const spellPower = getSpellPowerMultiplier(now, baseMps);
+
   state.cooldowns[id] = now + spell.cooldown * 1000;
-  const mps = productionPerSecond(state, boosts.production);
-  if (spell.type === 'burst') {
-    const gain = spell.effect(state, mps);
+  state.spells.lastSpellCastAt = now;
+
+  if (activeSpells['eternal-embers'] && activeSpells['eternal-embers'].expiresAt > now && id !== 'eternal-embers') {
+    state.spells.eternalEmbersStacks += activeSpells['eternal-embers'].stackGain;
+  }
+
+  if (spell.type === 'echo') {
+    const config = spell.effect(state);
+    const windowMs = config.window * 1000;
+    const recent = manaHistory
+      .filter((x) => now - x.now <= windowMs)
+      .reduce((sum, x) => sum + x.gain, 0);
+    const gain = recent * config.efficiency * spellPower;
     state.mana += gain;
     state.lifetimeMana += gain;
     floating.push(`+${formatNumber(gain)}`, 170, 220, '#d7a4ff');
-  } else {
-    boosts.expiresAt = Math.max(boosts.expiresAt, now + spell.duration * 1000);
-    if (spell.type === 'boost') boosts.production = spell.effect();
-    if (spell.type === 'speed') boosts.speed = spell.effect();
-    if (spell.type === 'autoclick') boosts.autoClick = spell.effect();
+    return;
   }
+
+  if (spell.type === 'sacrifice') {
+    const config = spell.effect(state);
+    const drain = state.mana * config.drain;
+    state.mana -= drain;
+    activeSpells[id] = {
+      expiresAt: now + spell.duration * 1000,
+      mult: 1 + (config.mult - 1) * spellPower
+    };
+    floating.push(`-${formatNumber(drain)}`, 170, 220, '#ff9cb3');
+    return;
+  }
+
+  if (spell.type === 'compound') {
+    const config = spell.effect(state);
+    activeSpells[id] = {
+      expiresAt: now + config.duration * 1000,
+      rate: config.rate,
+      mult: 1
+    };
+    return;
+  }
+
+  if (spell.type === 'reflection') {
+    const config = spell.effect(state);
+    activeSpells[id] = {
+      expiresAt: now + spell.duration * 1000,
+      bonusPct: config.bonusPct * spellPower
+    };
+    return;
+  }
+
+  if (spell.type === 'speed') {
+    activeSpells[id] = {
+      expiresAt: now + spell.duration * 1000,
+      speed: spell.effect(state) * spellPower
+    };
+    boosts.speed = activeSpells[id].speed;
+    return;
+  }
+
+  if (spell.type === 'fragment') {
+    const config = spell.effect(state);
+    activeSpells[id] = {
+      expiresAt: now + spell.duration * 1000,
+      fragments: config.fragments,
+      critChance: config.critChance,
+      critMult: config.critMult * spellPower
+    };
+    return;
+  }
+
+  if (spell.type === 'embers') {
+    const config = spell.effect(state);
+    activeSpells[id] = {
+      expiresAt: now + spell.duration * 1000,
+      stackGain: config.stackGain * spellPower,
+      decayPerSecond: config.decayPerSecond
+    };
+    return;
+  }
+
+  const config = spell.effect(state);
+  activeSpells[id] = { expiresAt: now + spell.duration * 1000, ...config };
 }
 
 const actions = {
@@ -104,7 +237,10 @@ refs.manualCast.addEventListener('click', castManual);
 refs.ascendBtn.addEventListener('click', () => {
   if (!canAscend(state)) return;
   state = performAscension(state);
-  boosts.production = 1; boosts.speed = 1; boosts.autoClick = 0;
+  state.spells = { eternalEmbersStacks: 0, lastSpellCastAt: 0 };
+  boosts.speed = 1;
+  boosts.spellPower = 1;
+  for (const id of Object.keys(activeSpells)) delete activeSpells[id];
   saveGame(state);
 });
 refs.offlineClose.addEventListener('click', () => refs.offlinePopup.classList.add('hidden'));
@@ -116,23 +252,58 @@ document.getElementById('mobile-tabs').addEventListener('click', (e) => {
 applyOfflineProgress();
 
 let last = performance.now();
-function loop(now) {
-  const dt = Math.min((now - last) / 1000, 0.25) * boosts.speed;
-  last = now;
-  if (Date.now() > boosts.expiresAt) boosts.production = 1, boosts.speed = 1, boosts.autoClick = 0;
-
-  const mps = productionPerSecond(state, boosts.production);
-  const gain = mps * dt;
-  state.mana += gain;
-  state.lifetimeMana += gain;
-
-  if (boosts.autoClick > 0) {
-    const autoGain = boosts.autoClick * dt;
-    state.mana += autoGain;
-    state.lifetimeMana += autoGain;
+function loop(nowTick) {
+  const now = Date.now();
+  if (activeSpells['chrono-acceleration-field']?.expiresAt > now) {
+    boosts.speed = activeSpells['chrono-acceleration-field'].speed;
+  } else {
+    boosts.speed = 1;
   }
 
-  renderUI(state, refs, actions, { mps });
+  for (const [id, data] of Object.entries(activeSpells)) {
+    if (data.expiresAt <= now) {
+      delete activeSpells[id];
+      if (id === 'arcane-compound-interest') {
+        // explicit reset via removal
+      }
+    }
+  }
+
+  const dt = Math.min((nowTick - last) / 1000, 0.25) * boosts.speed;
+  last = nowTick;
+
+  if (activeSpells['arcane-compound-interest']) {
+    const compound = activeSpells['arcane-compound-interest'];
+    compound.mult *= 1 + compound.rate * dt;
+  }
+
+  if (state.spells.eternalEmbersStacks > 0) {
+    const decay = activeSpells['eternal-embers']?.decayPerSecond || 0.006;
+    state.spells.eternalEmbersStacks = Math.max(0, state.spells.eternalEmbersStacks - decay * dt);
+  }
+
+  const productionMult = totalProductionMultiplier(now);
+  const baseMps = productionPerSecond(state, productionMult);
+
+  let gain = baseMps * dt;
+  if (activeSpells['astral-fragmentation']) {
+    const frag = activeSpells['astral-fragmentation'];
+    let crits = 0;
+    for (let i = 0; i < frag.fragments; i += 1) {
+      if (Math.random() < frag.critChance * dt) crits += 1;
+    }
+    if (crits > 0) {
+      const bonusMult = 1 + ((frag.critMult - 1) * crits) / frag.fragments;
+      gain *= bonusMult;
+    }
+  }
+
+  state.mana += gain;
+  state.lifetimeMana += gain;
+  pushManaHistory(now, gain);
+
+  const computedMps = productionPerSecond(state, totalProductionMultiplier(now));
+  renderUI(state, refs, actions, { mps: computedMps });
   floating.tick(dt);
   requestAnimationFrame(loop);
 }
