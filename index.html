@@ -991,6 +991,7 @@
     const petData = {
       emberFox: {
         name: "Ember Fox",
+        tier: 1,
         image: webIcon("🦊"),
         bonusText: "Global production",
         xpScale: 1,
@@ -999,6 +1000,7 @@
       },
       astralOwl: {
         name: "Astral Owl",
+        tier: 1,
         image: webIcon("🦉"),
         bonusText: "Spell power",
         xpScale: 1,
@@ -1007,6 +1009,7 @@
       },
       manaSlime: {
         name: "Mana Slime",
+        tier: 1,
         image: webIcon("🫧"),
         bonusText: "Mana from production",
         xpScale: 1.05,
@@ -1015,6 +1018,7 @@
       },
       clockworkImp: {
         name: "Clockwork Imp",
+        tier: 1,
         image: webIcon("😈"),
         bonusText: "Cast XP gain",
         xpScale: 1.12,
@@ -1023,13 +1027,71 @@
       },
       voidTurtle: {
         name: "Void Turtle",
+        tier: 1,
         image: webIcon("🐢"),
         bonusText: "Offline mana",
         xpScale: 1.25,
         bonus: (level) => 0.2 + ((level - 1) * 0.07),
         apply: (mods, value) => { mods.offlineMana *= 1 + value; },
       },
+      infernoFox: {
+        name: "Inferno Fox",
+        tier: 2,
+        unlockFrom: "emberFox",
+        image: webIcon("🔥"),
+        bonusText: "Global production",
+        xpScale: 1.38,
+        bonus: (level) => 0.5 + ((level - 1) * 0.11),
+        apply: (mods, value) => { mods.production *= 1 + value; },
+      },
+      eclipseOwl: {
+        name: "Eclipse Owl",
+        tier: 2,
+        unlockFrom: "astralOwl",
+        image: webIcon("🌒"),
+        bonusText: "Spell power",
+        xpScale: 1.38,
+        bonus: (level) => 0.55 + ((level - 1) * 0.12),
+        apply: (mods, value) => { mods.spell *= 1 + value; },
+      },
+      prismaticSlime: {
+        name: "Prismatic Slime",
+        tier: 2,
+        unlockFrom: "manaSlime",
+        image: webIcon("🌈"),
+        bonusText: "Mana from production",
+        xpScale: 1.45,
+        bonus: (level) => 0.6 + ((level - 1) * 0.1),
+        apply: (mods, value) => { mods.manaGain *= 1 + value; },
+      },
+      chronoImp: {
+        name: "Chrono Imp",
+        tier: 2,
+        unlockFrom: "clockworkImp",
+        image: webIcon("⏱️"),
+        bonusText: "Cast XP gain",
+        xpScale: 1.52,
+        bonus: (level) => 0.45 + ((level - 1) * 0.09),
+        apply: (mods, value) => { mods.petXp *= 1 + value; },
+      },
+      titanTurtle: {
+        name: "Titan Turtle",
+        tier: 2,
+        unlockFrom: "voidTurtle",
+        image: webIcon("🪨"),
+        bonusText: "Offline mana",
+        xpScale: 1.6,
+        bonus: (level) => 0.7 + ((level - 1) * 0.13),
+        apply: (mods, value) => { mods.offlineMana *= 1 + value; },
+      },
     };
+
+    function isPetUnlocked(petKey) {
+      const pet = petData[petKey];
+      if (!pet) return false;
+      if (!pet.unlockFrom) return true;
+      return petState(pet.unlockFrom).level >= 99;
+    }
 
     const achievementData = [
       { key: "mana1k", name: "Power Hoarder I", image: webIcon("🥉"), test: (s) => s.totalPower >= 1000, requirement: "Accumulate 1,000 total power from any source.", reward: "+5% structure output", tooltip: "First hoarding milestone. Keep casting and buying structures until lifetime power hits 1,000." },
@@ -1352,7 +1414,7 @@
     }
 
     function togglePetEquip(petKey) {
-      if (!petData[petKey]) return;
+      if (!petData[petKey] || !isPetUnlocked(petKey)) return;
       if (state.petEquipped.includes(petKey)) {
         state.petEquipped = state.petEquipped.filter((key) => key !== petKey);
         return;
@@ -1791,24 +1853,41 @@
       const slotLimit = getPetSlotLimit();
       els.petSlotsInfo.textContent = `Equipped: ${state.petEquipped.length} / ${slotLimit} slots`;
 
-      for (const [petKey, pet] of Object.entries(petData)) {
+      const petEntries = Object.entries(petData).sort(([leftKey, leftPet], [rightKey, rightPet]) => {
+        const leftEquipped = state.petEquipped.includes(leftKey);
+        const rightEquipped = state.petEquipped.includes(rightKey);
+        if (leftEquipped !== rightEquipped) return leftEquipped ? -1 : 1;
+        const leftUnlocked = isPetUnlocked(leftKey);
+        const rightUnlocked = isPetUnlocked(rightKey);
+        if (leftUnlocked !== rightUnlocked) return leftUnlocked ? -1 : 1;
+        if ((leftPet.tier || 1) !== (rightPet.tier || 1)) return (leftPet.tier || 1) - (rightPet.tier || 1);
+        return leftPet.name.localeCompare(rightPet.name);
+      });
+
+      for (const [petKey, pet] of petEntries) {
         const info = petState(petKey);
         const needed = petXpNeeded(info.level, pet.xpScale);
         const pct = Math.max(0, Math.min(100, (info.xp / needed) * 100));
         const bonusPct = pet.bonus(info.level) * 100;
         const equipped = state.petEquipped.includes(petKey);
-        const blocked = !equipped && state.petEquipped.length >= slotLimit;
+        const unlocked = isPetUnlocked(petKey);
+        const blocked = !equipped && (state.petEquipped.length >= slotLimit || !unlocked);
+        const unlockText = !unlocked && pet.unlockFrom
+          ? `Unlock: ${petData[pet.unlockFrom].name} Lv 99`
+          : "";
         const card = document.createElement("div");
         card.className = "item";
         card.innerHTML = `
           <img class="item-icon" src="${pet.image}" alt="${pet.name} icon" title="${pet.bonusText}" />
           <div>
             <div class="name">${pet.name} ${equipped ? '<span class="pill">Equipped</span>' : ""}</div>
+            <div class="meta">Tier ${pet.tier || 1}</div>
             <div class="meta">Lv ${info.level} • ${pet.bonusText}: +${bonusPct.toFixed(1)}%</div>
             <div class="meta">XP ${format(info.xp)} / ${format(needed)}</div>
+            ${unlockText ? `<div class="meta">${unlockText}</div>` : ""}
             <div class="level-bar"><span style="width:${pct.toFixed(1)}%"></span></div>
           </div>
-          <button ${blocked ? "disabled" : ""}>${equipped ? "Unequip" : "Equip"}</button>
+          <button ${blocked ? "disabled" : ""}>${equipped ? "Unequip" : (unlocked ? "Equip" : "Locked")}</button>
         `;
 
         card.querySelector("button").addEventListener("pointerdown", (event) => {
