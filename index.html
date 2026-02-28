@@ -458,11 +458,12 @@
       voidReactor: { name: "Void Reactor", baseCost: 1300000, mps: 63000, growth: 1.29, image: webIcon("🌌"), tooltip: "Harnesses dark-space turbulence for late-game production spikes." },
     };
 
-        const upgradeData = {
+    const upgradeData = {
       focusedWand: {
         name: "Focused Wand",
         cost: 60,
         effect: "Double Arcane Bolt power",
+        school: "Arcane",
         image: webIcon("🪄"),
         tooltip: "Focused Wand strengthens each manual cast, making every click worth twice as much mana.",
         apply: (state) => state.clickPower *= 2,
@@ -471,6 +472,7 @@
         name: "Dual Channeling",
         cost: 450,
         effect: "Arcane Bolt gains +8 power",
+        school: "Arcane",
         image: webIcon("✨"),
         tooltip: "Dual Channeling weaves two spells at once so each cast adds a large flat mana bonus.",
         apply: (state) => state.clickPower += 8,
@@ -479,6 +481,7 @@
         name: "Rune Etching",
         cost: 1200,
         effect: "All spell power +30%",
+        school: "Arcane",
         image: webIcon("🔯"),
         tooltip: "Arcane runes amplify the impact of every offensive cast.",
         apply: () => {},
@@ -487,6 +490,7 @@
         name: "Mana Compression",
         cost: 4200,
         effect: "Spell costs -20%",
+        school: "Arcane",
         image: webIcon("🧿"),
         tooltip: "Dense mana channels reduce the mana needed to cast heavy spells.",
         apply: () => {},
@@ -495,6 +499,7 @@
         name: "Leyline Binding",
         cost: 1400,
         effect: "All structures produce +25% mana",
+        school: "Nature",
         image: webIcon("🧬"),
         tooltip: "Leyline Binding anchors your tower to nearby leylines, increasing all structure output.",
         apply: () => {},
@@ -503,6 +508,7 @@
         name: "Crystallized Thought",
         cost: 6000,
         effect: "All structures produce +50% mana",
+        school: "Mind",
         image: webIcon("💎"),
         tooltip: "Crystallized Thought refines magical focus, delivering a major global boost to structures.",
         apply: () => {},
@@ -511,6 +517,7 @@
         name: "Archmage Sigil",
         cost: 26000,
         effect: "All structures produce +120% mana",
+        school: "Arcane",
         image: webIcon("🔱"),
         tooltip: "An ancient sigil that supercharges every mana engine in your empire.",
         apply: () => {},
@@ -519,6 +526,7 @@
         name: "Tempest Mastery",
         cost: 90000,
         effect: "Lightning and Meteor spells +90% power",
+        school: "Elemental",
         image: webIcon("⚡"),
         tooltip: "Mastery over storm magic dramatically boosts high-tier burst spells.",
         apply: () => {},
@@ -527,6 +535,7 @@
         name: "Planar Refinery",
         cost: 350000,
         effect: "All structures produce +180% mana",
+        school: "Void",
         image: webIcon("🏭"),
         tooltip: "Distills planar residue into endless fuel for your late-game production chain.",
         apply: () => {},
@@ -535,6 +544,7 @@
         name: "Celestial Lattice",
         cost: 1200000,
         effect: "All spell power +120%",
+        school: "Celestial",
         image: webIcon("🌠"),
         tooltip: "Interlocks starlight and sigils so every spell detonates with vastly greater force.",
         apply: () => {},
@@ -543,8 +553,59 @@
         name: "Singularity Core",
         cost: 4500000,
         effect: "All structures produce +300% mana and spell costs -25%",
+        school: "Void",
         image: webIcon("🕳️"),
         tooltip: "A compressed void-kernel that warps production and dramatically improves spell efficiency.",
+        apply: () => {},
+      },
+      apprenticeTheory: {
+        name: "Apprentice Theory",
+        cost: 900,
+        effect: "Unlocks scaling Arcane Study research",
+        school: "Arcane",
+        image: webIcon("📜"),
+        tooltip: "Inspired by Idle Wizard's layered upgrade trees: this opens repeatable spell research.",
+        requirementText: "Reach 1,500 total power",
+        requirement: (s) => s.totalPower >= 1500,
+        apply: () => {},
+      },
+      arcaneStudy: {
+        name: "Arcane Study",
+        cost: 1500,
+        effect: "+8% spell power per level",
+        school: "Arcane",
+        repeatable: true,
+        growth: 1.7,
+        image: webIcon("📘"),
+        tooltip: "A repeatable tome upgrade inspired by Idle Wizard's scaling upgrade purchases.",
+        requirementText: "Learn Apprentice Theory",
+        requirement: (s) => s.upgrades.apprenticeTheory,
+        apply: () => {},
+      },
+      manaInfusion: {
+        name: "Mana Infusion",
+        cost: 4000,
+        effect: "+6% structure output per level",
+        school: "Elemental",
+        repeatable: true,
+        growth: 1.8,
+        image: webIcon("💠"),
+        tooltip: "A scaling infusion line similar to long-form Idle Wizard enhancement chains.",
+        requirementText: "Own 12 total structures",
+        requirement: (s) => Object.values(s.structures).reduce((sum, amount) => sum + amount, 0) >= 12,
+        apply: () => {},
+      },
+      ritualEconomy: {
+        name: "Ritual Economy",
+        cost: 9000,
+        effect: "Spell costs -3% per level (cap 45%)",
+        school: "Void",
+        repeatable: true,
+        growth: 2,
+        image: webIcon("🕯️"),
+        tooltip: "Late-game spell efficiency research modeled after compounding upgrade systems.",
+        requirementText: "Cast 80 spells",
+        requirement: (s) => s.spellCasts >= 80,
         apply: () => {},
       },
     };
@@ -580,7 +641,7 @@
       activeSpell: "bolt",
       spellCasts: 0,
       structures: Object.fromEntries(Object.keys(structureData).map((k) => [k, 0])),
-      upgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, false])),
+      upgrades: Object.fromEntries(Object.keys(upgradeData).map((k) => [k, 0])),
       achievements: Object.fromEntries(achievementData.map((a) => [a.key, false])),
       lastTick: Date.now(),
       lastSavedAt: null,
@@ -636,6 +697,30 @@
       state.log = state.log.slice(0, 90);
     }
 
+
+    function upgradeLevel(key) {
+      return Number(state.upgrades[key] || 0);
+    }
+
+    function hasUpgrade(key) {
+      return upgradeLevel(key) > 0;
+    }
+
+    function getUpgradeCost(key) {
+      const up = upgradeData[key];
+      if (!up) return Infinity;
+      const level = upgradeLevel(key);
+      if (!up.repeatable && level > 0) return Infinity;
+      const growth = up.growth || 1;
+      return Math.floor(up.cost * Math.pow(growth, level));
+    }
+
+    function meetsUpgradeRequirement(key) {
+      const up = upgradeData[key];
+      if (!up || typeof up.requirement !== "function") return true;
+      return up.requirement(state);
+    }
+
     function getStructureCost(key, levelOffset = 0) {
       const data = structureData[key];
       const level = state.structures[key] + levelOffset;
@@ -652,11 +737,11 @@
 
     function productionMultiplier() {
       let mult = 1;
-      if (state.upgrades.leylineBinding) mult *= 1.25;
-      if (state.upgrades.crystallizedThought) mult *= 1.5;
-      if (state.upgrades.archmageSigil) mult *= 2.2;
-      if (state.upgrades.planarRefinery) mult *= 2.8;
-      if (state.upgrades.singularityCore) mult *= 4;
+      if (hasUpgrade("leylineBinding")) mult *= 1.25;
+      if (hasUpgrade("crystallizedThought")) mult *= 1.5;
+      if (hasUpgrade("archmageSigil")) mult *= 2.2;
+      if (hasUpgrade("planarRefinery")) mult *= 2.8;
+      if (hasUpgrade("singularityCore")) mult *= 4;
       if (state.achievements.mana1k) mult *= 1.05;
       if (state.achievements.mana20k) mult *= 1.1;
       if (state.achievements.mana250k) mult *= 1.15;
@@ -670,25 +755,28 @@
       for (const [key, amount] of Object.entries(state.structures)) {
         total += amount * structureData[key].mps;
       }
-      return total * productionMultiplier();
+      const infusionBonus = 1 + (upgradeLevel("manaInfusion") * 0.06);
+      return total * productionMultiplier() * infusionBonus;
     }
 
 
     function spellCost(key) {
       const base = spellData[key].manaCost;
-      const reduction = state.upgrades.manaCompression ? 0.8 : 1;
-      const singularityDiscount = state.upgrades.singularityCore ? 0.75 : 1;
+      const reduction = hasUpgrade("manaCompression") ? 0.8 : 1;
+      const singularityDiscount = hasUpgrade("singularityCore") ? 0.75 : 1;
       const masteryDiscount = state.achievements.spellweaver ? 0.9 : 1;
-      return Math.floor(base * reduction * singularityDiscount * masteryDiscount);
+      const ritualReduction = Math.max(0.55, 1 - (upgradeLevel("ritualEconomy") * 0.03));
+      return Math.floor(base * reduction * singularityDiscount * masteryDiscount * ritualReduction);
     }
 
     function spellPower(key) {
       let power = spellData[key].basePower;
       if (key === "bolt") power = Math.max(power, state.clickPower);
-      if (state.upgrades.runeEtching) power *= 1.3;
-      if (state.upgrades.tempestMastery && (key === "lightning" || key === "meteor")) power *= 1.9;
-      if (state.upgrades.celestialLattice) power *= 2.2;
+      if (hasUpgrade("runeEtching")) power *= 1.3;
+      if (hasUpgrade("tempestMastery") && (key === "lightning" || key === "meteor")) power *= 1.9;
+      if (hasUpgrade("celestialLattice")) power *= 2.2;
       if (state.achievements.skyLord) power *= 1.15;
+      power *= 1 + (upgradeLevel("arcaneStudy") * 0.08);
       return power;
     }
 
@@ -717,11 +805,19 @@
 
     function buyUpgrade(key) {
       const up = upgradeData[key];
-      if (state.upgrades[key] || !canAfford(up.cost)) return;
-      state.power -= up.cost;
-      state.upgrades[key] = true;
+      if (!up || !meetsUpgradeRequirement(key)) return;
+      const cost = getUpgradeCost(key);
+      if (!canAfford(cost)) return;
+
+      state.power -= cost;
+      state.upgrades[key] = upgradeLevel(key) + 1;
       up.apply(state);
-      addLog(`Learned upgrade: ${up.name}. ${up.effect}`, "ok");
+
+      if (up.repeatable) {
+        addLog(`Studied ${up.name} (Level ${upgradeLevel(key)}).`, "ok");
+      } else {
+        addLog(`Learned upgrade: ${up.name}. ${up.effect}`, "ok");
+      }
       render();
     }
 
@@ -812,7 +908,8 @@
         state.structures[key] = Number(data.structures?.[key] || 0);
       }
       for (const key of Object.keys(state.upgrades)) {
-        state.upgrades[key] = Boolean(data.upgrades?.[key]);
+        const loaded = data.upgrades?.[key];
+        state.upgrades[key] = loaded === true ? 1 : Number(loaded || 0);
       }
       for (const key of Object.keys(state.achievements)) {
         state.achievements[key] = Boolean(data.achievements?.[key]);
@@ -890,17 +987,21 @@
     function renderUpgrades() {
       els.upgrades.innerHTML = "";
       for (const [key, up] of Object.entries(upgradeData)) {
-        const unlocked = state.upgrades[key];
-        const disabled = unlocked || !canAfford(up.cost);
+        const level = upgradeLevel(key);
+        const maxed = !up.repeatable && level > 0;
+        const requirementMet = meetsUpgradeRequirement(key);
+        const nextCost = getUpgradeCost(key);
+        const disabled = maxed || !requirementMet || !canAfford(nextCost);
         const card = document.createElement("div");
         card.className = "item";
         card.innerHTML = `
           <img class="item-icon" src="${up.image}" alt="${up.name} icon" title="${up.tooltip}" />
           <div>
-            <div class="name">${up.name} ${unlocked ? '<span class="pill">Learned</span>' : ""}</div>
-            <div class="meta">${up.effect} • Cost: ${format(up.cost)} power</div>
+            <div class="name">${up.name} <span class="pill">${up.school || "Arcane"}</span>${level > 0 ? `<span class="pill">Lv ${level}</span>` : ""}${maxed ? '<span class="pill">Learned</span>' : ""}</div>
+            <div class="meta">${up.effect} • Cost: ${Number.isFinite(nextCost) ? format(nextCost) : "--"} power</div>
+            ${up.requirementText ? `<div class="meta">Req: ${up.requirementText}${requirementMet ? "" : " (not met)"}</div>` : ""}
           </div>
-          <button ${disabled ? "disabled" : ""}>${unlocked ? "Done" : "Research"}</button>
+          <button ${disabled ? "disabled" : ""}>${maxed ? "Done" : up.repeatable ? "Study" : "Research"}</button>
         `;
         const upgradeButton = card.querySelector("button");
         upgradeButton.addEventListener("pointerdown", (event) => {
