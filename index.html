@@ -1716,6 +1716,22 @@
         gl.drawArrays(gl.TRIANGLES, 0, vertices.length / 3);
       }
 
+      function worldToScreen(point, matrix) {
+        const x = point[0];
+        const y = point[1];
+        const z = point[2];
+        const clipX = (matrix[0] * x) + (matrix[4] * y) + (matrix[8] * z) + matrix[12];
+        const clipY = (matrix[1] * x) + (matrix[5] * y) + (matrix[9] * z) + matrix[13];
+        const clipW = (matrix[3] * x) + (matrix[7] * y) + (matrix[11] * z) + matrix[15];
+        if (!Number.isFinite(clipW) || clipW <= 0) return null;
+        const ndcX = clipX / clipW;
+        const ndcY = clipY / clipW;
+        return {
+          x: (ndcX * 0.5) + 0.5,
+          y: 1 - ((ndcY * 0.5) + 0.5),
+        };
+      }
+
       function boxVertices(center, size) {
         const [cx, cy, cz] = center;
         const [sx, sy, sz] = [size[0] / 2, size[1] / 2, size[2] / 2];
@@ -1852,6 +1868,10 @@
           const travelLift = 0.05 + ((1 - shot.progress) * 0.12);
           drawTriangles(sphereVertices([p.x, travelLift, p.z], 0.025, 8, 6), [0.6, 0.9, 1, Math.max(0.25, 1 - shot.progress)], camera);
         }
+
+        return {
+          enemyHudAnchor: worldToScreen([enemy.x, 0.32, enemy.z], camera),
+        };
       }
 
       return { render, available: true };
@@ -3029,10 +3049,8 @@
       els.tdWave.textContent = String(td.wave);
       els.tdBreaches.textContent = String(td.breaches);
       els.tdDistance.textContent = `Distance to gate: ${(100 - progressPct).toFixed(0)}% • HP ${(hpPct).toFixed(0)}%`;
-      els.tdEnemyUnit.style.left = `${enemyPos.x.toFixed(2)}%`;
-      els.tdEnemyUnit.style.top = `${enemyPos.y.toFixed(2)}%`;
       els.tdEnemyHealthFill.style.width = `${hpPct.toFixed(2)}%`;
-      tdRenderer.render({
+      const tdRenderData = tdRenderer.render({
         enemyProgress: td.enemyProgress,
         enemyPosition: enemyPos,
         lowPower: towerPowerLow,
@@ -3048,6 +3066,18 @@
           };
         }),
       });
+      const enemyHudAnchor = tdRenderData?.enemyHudAnchor;
+      if (enemyHudAnchor) {
+        const clampedX = Math.max(0.02, Math.min(0.98, enemyHudAnchor.x));
+        const clampedY = Math.max(0.03, Math.min(0.97, enemyHudAnchor.y));
+        els.tdEnemyUnit.style.left = `${(clampedX * 100).toFixed(2)}%`;
+        els.tdEnemyUnit.style.top = `${(clampedY * 100).toFixed(2)}%`;
+        els.tdEnemyUnit.style.opacity = "1";
+      } else {
+        els.tdEnemyUnit.style.left = `${enemyPos.x.toFixed(2)}%`;
+        els.tdEnemyUnit.style.top = `${enemyPos.y.toFixed(2)}%`;
+        els.tdEnemyUnit.style.opacity = tdRenderer.available ? "0" : "1";
+      }
       els.tdDamageLayer.innerHTML = td.damageNumbers.map((num) => {
         const alpha = Math.max(0, 1 - (num.age / Math.max(0.001, num.life)));
         return `<span class="td-damage" style="left:${num.x.toFixed(2)}%;top:${num.y.toFixed(2)}%;opacity:${alpha.toFixed(2)}">-${format(num.value)}</span>`;
