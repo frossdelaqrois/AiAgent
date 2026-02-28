@@ -598,29 +598,6 @@
       padding: 10px;
     }
 
-    .guide-list {
-      margin: 0;
-      padding-left: 18px;
-      display: grid;
-      gap: 8px;
-      color: #e9dfc3;
-    }
-
-    .guide-list li {
-      line-height: 1.4;
-    }
-
-    .guide-note {
-      margin-top: 10px;
-      padding: 10px;
-      border-radius: 10px;
-      border: 1px solid rgba(155, 201, 255, 0.4);
-      background: rgba(30, 33, 56, 0.35);
-      color: #c6deff;
-      font-size: 0.9rem;
-      line-height: 1.4;
-    }
-
     .spell-head {
       display: flex;
       gap: 10px;
@@ -732,21 +709,6 @@
     <section class="panel">
       <h2>🏆 Achievements</h2>
       <div id="achievements" class="shop scroll-shop"></div>
-    </section>
-
-    <section class="panel wide">
-      <h2>📖 Spell Casting Guide</h2>
-      <ul class="guide-list">
-        <li><strong>Careful (Blue):</strong> A spell autocasts only when it gains its final charge. Use <strong>Alt + click</strong> (or <strong>Alt + number</strong>) to queue precise combos while other spells continue charging.</li>
-        <li><strong>Reckless (Red):</strong> A spell autocasts as soon as it gains any charge. Use <strong>Shift + click</strong> (or <strong>Shift + number</strong>) for high-frequency casting.</li>
-        <li><strong>Cast-rate limits:</strong> Instant spells can cast once every 2 frames and duration spells once every 3 frames. At 120 FPS, this caps at 60 instant casts/sec or 40 duration casts/sec.</li>
-        <li><strong>Autocast order:</strong> If multiple spells are ready in the same frame, they resolve <strong>left to right</strong> on the bar, so slot order directly affects combo outcomes.</li>
-        <li><strong>Spell roles:</strong> <strong>Evocation</strong> spells are burst payouts, <strong>Incantation</strong> spells are temporary amplifiers, and <strong>Summoning</strong> spells sustain autoclick-based engines.</li>
-        <li><strong>Duration families:</strong> Spells can be Instant, Periodic, Continuous, or Augment, and each timing model changes recast behavior.</li>
-        <li><strong>Scaling families:</strong> Accumulated spells grow with cast count, while Persistent spells include an exile-reset active effect plus a realm-reset passive effect.</li>
-        <li><strong>Priority edge cases:</strong> Some spells are low-priority and only gain charges after other panel spells are full.</li>
-      </ul>
-      <div class="guide-note">Tip: Keep shard-generation and refresh spells near the right side of the bar so earlier left-side casts can be refilled inside the same autocast cycle.</div>
     </section>
 
     <section class="panel wide">
