@@ -31,16 +31,26 @@
         radial-gradient(circle at 70% 10%, rgba(194, 239, 255, 0.45) 0%, transparent 30%),
         radial-gradient(circle at 18% 20%, rgba(124, 183, 98, 0.32) 0%, transparent 36%),
         linear-gradient(180deg, #5fa7d8 0%, #2e6a52 24%, #3f7a3e 55%, #2c4028 100%);
-      padding: 20px;
+      padding: 16px;
       letter-spacing: 0.02em;
     }
 
     .game {
-      max-width: 1180px;
-      margin: 0 auto;
+      width: 100%;
+      max-width: none;
+      margin: 0;
       display: grid;
       grid-template-columns: 1.2fr 1fr;
       gap: 18px;
+    }
+
+    .dock-left {
+      grid-column: 1;
+    }
+
+    .dock-right {
+      grid-column: 2;
+      justify-self: stretch;
     }
 
     .panel {
@@ -650,6 +660,27 @@
       filter: hue-rotate(-25deg) saturate(1.2);
     }
 
+    .td-route-base {
+      fill: none;
+      stroke: rgba(52, 39, 24, 0.9);
+      stroke-width: 12;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .td-route-progress {
+      fill: none;
+      stroke: rgba(255, 239, 187, 0.95);
+      stroke-width: 7;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 0 5px rgba(255, 246, 213, 0.9));
+    }
+
+    .td-path.low-power {
+      filter: hue-rotate(-25deg) saturate(1.2);
+    }
+
     .td-enemy-unit {
       position: absolute;
       left: 14%;
@@ -682,18 +713,33 @@
       transition: width 0.12s linear;
     }
 
-    .td-decor {
+    .td-shots,
+    .td-damage-layer {
       position: absolute;
-      font-size: 2.2rem;
-      filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.45));
-      z-index: 1;
-      opacity: 0.95;
+      inset: 0;
+      pointer-events: none;
+      z-index: 4;
     }
 
-    .td-decor.t1 { left: 10%; top: 71%; }
-    .td-decor.t2 { left: 30%; top: 20%; }
-    .td-decor.t3 { right: 20%; top: 24%; }
-    .td-decor.t4 { left: 66%; top: 73%; }
+    .td-shot {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #ffffff, #8ad7ff 55%, #6a6fff 100%);
+      box-shadow: 0 0 8px rgba(135, 209, 255, 0.85);
+      transform: translate(-50%, -50%);
+    }
+
+    .td-damage {
+      position: absolute;
+      color: #ffe58f;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+      transform: translate(-50%, -50%);
+      white-space: nowrap;
+    }
 
     .td-webgl-canvas,
     .td-damage-layer {
@@ -880,6 +926,10 @@
 
     @media (max-width: 900px) {
       .game { grid-template-columns: 1fr; }
+      .dock-left,
+      .dock-right {
+        grid-column: auto;
+      }
       .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .equipment-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .td-grid { grid-template-columns: 1fr; }
@@ -930,11 +980,18 @@
         <div class="td-lane">
           <div class="tiny">Wave <b id="tdWave">1</b> • Breaches <b id="tdBreaches">0</b> / 5</div>
           <div class="td-battlefield">
-            <canvas id="tdWebglCanvas" class="td-webgl-canvas" aria-label="Tower defense battlefield (WebGL)"></canvas>
-            <div id="tdEnemyUnit" class="td-enemy-unit" aria-hidden="true">
-              <span class="td-enemy-health"><span id="tdEnemyHealthFill"></span></span>
-            </div>
+            <span id="tdPath" class="td-path"></span>
+            <svg class="td-route" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+              <polyline class="td-route-base" points="11,14 45,14 45,50 84,50 84,77"></polyline>
+              <polyline id="tdRouteProgress" class="td-route-progress" points="11,14 45,14 45,50 84,50 84,77"></polyline>
+            </svg>
+            <span id="tdShots" class="td-shots"></span>
             <span id="tdDamageLayer" class="td-damage-layer"></span>
+            <span id="tdEnemyUnit" class="td-enemy-unit">
+              <span class="td-enemy-health"><span id="tdEnemyHp"></span></span>
+              <span id="tdEnemyIcon" class="td-enemy-icon">👹</span>
+            </span>
+            <span class="td-tower-icon">🏯</span>
           </div>
           <div class="tiny" id="tdDistance">Distance to gate: 100%</div>
           <div id="tdPowerWarning" class="td-power-warning"></div>
@@ -953,7 +1010,7 @@
       <div id="quickslots" class="quickslot-bar"></div>
     </section>
 
-    <section class="panel">
+    <section class="panel dock-left">
       <div class="upgrade-head">
         <h2>🔮 Upgrades</h2>
         <button id="showAllUpgradesBtn" class="btn-ghost" type="button">All Upgrades</button>
@@ -961,7 +1018,7 @@
       <div id="upgrades" class="shop scroll-shop upgrade-grid"></div>
     </section>
 
-    <section class="panel">
+    <section class="panel dock-right">
       <h2>🧪 Structures</h2>
       <div class="buy-toggle" id="buyToggle">
         <button data-buy="1" class="active">x1</button>
@@ -1031,6 +1088,9 @@
   </div>
 
   <div id="achievementPopups" class="achievement-popups" aria-live="polite"></div>
+
+  <script>window.__RUST_TD_ACTIVE = true;</script>
+  <script type="module" src="js/towerDefenseRust.js"></script>
 
   <script>
     const STORAGE_KEY = "arcane-idle-save-v2";
@@ -1476,7 +1536,6 @@
         spellPressure: 0,
         spellFreezeSec: 0,
         shotCooldown: 0,
-        placedTowers: [],
         visualShots: [],
         damageNumbers: [],
       },
@@ -1508,7 +1567,9 @@
       tdReward: document.getElementById("tdReward"),
       tdWebglCanvas: document.getElementById("tdWebglCanvas"),
       tdEnemyUnit: document.getElementById("tdEnemyUnit"),
-      tdEnemyHealthFill: document.getElementById("tdEnemyHealthFill"),
+      tdEnemyIcon: document.getElementById("tdEnemyIcon"),
+      tdRouteProgress: document.getElementById("tdRouteProgress"),
+      tdShots: document.getElementById("tdShots"),
       tdDamageLayer: document.getElementById("tdDamageLayer"),
       tdPowerWarning: document.getElementById("tdPowerWarning"),
       spellSlotModal: document.getElementById("spellSlotModal"),
@@ -1891,9 +1952,12 @@
     }
 
 
-    const tdRenderer = createTowerDefenseWebGLRenderer(els.tdWebglCanvas);
+    const tdRenderer = window.__RUST_TD_ACTIVE
+      ? { render: () => ({ enemyHudAnchor: { x: 0, y: 0, visible: false }, damageAnchors: [] }), available: false }
+      : createTowerDefenseWebGLRenderer(els.tdWebglCanvas);
 
     els.tdWebglCanvas.addEventListener("click", (event) => {
+      if (window.__RUST_TD_ACTIVE) return;
       if (event.button !== 0) return;
       const rect = els.tdWebglCanvas.getBoundingClientRect();
       if (rect.width <= 0 || rect.height <= 0) return;
@@ -2242,17 +2306,12 @@
       return { x: 90, y: 81 };
     }
 
-    function tdAllTowerPositions() {
-      return [tdTowerPosition(), ...(state.towerDefense.placedTowers || [])];
-    }
-
     function addTdDamageNumber(value, position) {
       if (value <= 0) return;
       state.towerDefense.damageNumbers.push({
         value,
         x: position.x,
         y: position.y - 2,
-        enemyPathPosition: { x: position.x, y: position.y },
         life: 0.7,
         age: 0,
       });
@@ -2263,8 +2322,7 @@
 
     function spawnTowerShot(damage) {
       const enemyPos = tdPathPosition(state.towerDefense.enemyProgress);
-      const towers = tdAllTowerPositions();
-      const from = towers[Math.floor(Math.random() * towers.length)] || tdTowerPosition();
+      const from = tdTowerPosition();
       state.towerDefense.visualShots.push({
         from,
         to: enemyPos,
@@ -2501,11 +2559,16 @@
       render();
     }
 
+    function toFiniteNumber(value, fallback = 0) {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+
     function normalizeLoadedState(data) {
-      state.power = Number((data.power ?? data.mana) || 0);
-      state.mana = Number(data.mana || 0);
-      state.totalPower = Number((data.totalPower ?? data.totalMana) || 0);
-      state.clickPower = Number(data.clickPower || 1);
+      state.power = toFiniteNumber((data.power ?? data.mana), 0);
+      state.mana = toFiniteNumber(data.mana, 0);
+      state.totalPower = toFiniteNumber((data.totalPower ?? data.totalMana), 0);
+      state.clickPower = Math.max(1, toFiniteNumber(data.clickPower, 1));
       state.buyAmount = [1, 10, 25].includes(Number(data.buyAmount)) ? Number(data.buyAmount) : 1;
       state.activeQuickslot = Number.isInteger(data.activeQuickslot) ? Math.min(Math.max(0, data.activeQuickslot), spellQuickslotCount - 1) : 0;
       const loadedSlots = Array.isArray(data.quickslots) ? data.quickslots : [];
@@ -2519,19 +2582,19 @@
       if (!state.quickslots.some((key) => typeof key === "string" && spellData[key])) {
         state.quickslots[0] = "spell1";
       }
-      state.spellCasts = Number(data.spellCasts || 0);
+      state.spellCasts = Math.max(0, toFiniteNumber(data.spellCasts, 0));
       state.activeSpells = {};
       for (const [key, entry] of Object.entries(data.activeSpells || {})) {
         if (!spellData[key]) continue;
-        const expiresAt = Number(entry?.expiresAt || 0);
-        const powerPerSecond = Number(entry?.powerPerSecond || 0);
+        const expiresAt = toFiniteNumber(entry?.expiresAt, 0);
+        const powerPerSecond = toFiniteNumber(entry?.powerPerSecond, 0);
         if (expiresAt > Date.now() && powerPerSecond > 0) {
           state.activeSpells[key] = { expiresAt, powerPerSecond };
         }
       }
 
       for (const key of Object.keys(state.structures)) {
-        state.structures[key] = Number(data.structures?.[key] || 0);
+        state.structures[key] = Math.max(0, Math.floor(toFiniteNumber(data.structures?.[key], 0)));
       }
       for (const key of Object.keys(state.equipment)) {
         const gearId = data.equipment?.[key] || null;
@@ -2545,7 +2608,7 @@
         for (const gear of slotItems) {
           if (loadedOwnedGear[gear.id]) state.ownedGear[gear.id] = true;
           if (state.ownedGear[gear.id]) {
-            const loadedLevel = Number(data.gearLevels?.[gear.id] || 1);
+            const loadedLevel = toFiniteNumber(data.gearLevels?.[gear.id], 1);
             state.gearLevels[gear.id] = Math.max(1, loadedLevel);
           }
         }
@@ -2558,7 +2621,7 @@
       }
       for (const key of Object.keys(state.upgrades)) {
         const loaded = data.upgrades?.[key];
-        state.upgrades[key] = loaded === true ? 1 : Number(loaded || 0);
+        state.upgrades[key] = loaded === true ? 1 : Math.max(0, Math.floor(toFiniteNumber(loaded, 0)));
       }
       for (const key of Object.keys(state.revealedUpgrades)) {
         state.revealedUpgrades[key] = Boolean(data.revealedUpgrades?.[key]) || state.upgrades[key] > 0;
@@ -2570,8 +2633,8 @@
       for (const petKey of Object.keys(petData)) {
         const loadedPet = data.pets?.[petKey];
         state.pets[petKey] = {
-          level: Math.max(1, Math.floor(Number(loadedPet?.level || 1))),
-          xp: Math.max(0, Number(loadedPet?.xp || 0)),
+          level: Math.max(1, Math.floor(toFiniteNumber(loadedPet?.level, 1))),
+          xp: Math.max(0, toFiniteNumber(loadedPet?.xp, 0)),
         };
       }
       const loadedEquipped = Array.isArray(data.petEquipped)
@@ -2582,8 +2645,8 @@
       if (state.petEquipped.length === 0) {
         state.petEquipped = Object.keys(petData).slice(0, slotLimit);
       }
-      const loadedLevel = Number(data.playerLevel || 0);
-      const loadedProgress = Number(data.levelProgressPower);
+      const loadedLevel = toFiniteNumber(data.playerLevel, 0);
+      const loadedProgress = toFiniteNumber(data.levelProgressPower, 0);
       if (loadedLevel > 0) {
         state.playerLevel = Math.floor(loadedLevel);
         state.levelProgressPower = Number.isFinite(loadedProgress) ? Math.max(0, loadedProgress) : 0;
@@ -2592,27 +2655,26 @@
         state.playerLevel = estimated.level;
         state.levelProgressPower = estimated.progressPower;
       }
-      state.levelBonus = Number.isFinite(data.levelBonus) ? Number(data.levelBonus) : (state.playerLevel - 1) * 0.05;
+      state.levelBonus = Number.isFinite(data.levelBonus) ? toFiniteNumber(data.levelBonus, 0) : (state.playerLevel - 1) * 0.05;
       const loadedTd = data.towerDefense || {};
       const loadedPlacedTowers = Array.isArray(loadedTd.placedTowers)
         ? loadedTd.placedTowers
           .map((tower) => ({
-            x: Math.max(8, Math.min(93, Number(tower?.x))),
-            y: Math.max(8, Math.min(90, Number(tower?.y))),
+            x: Math.max(8, Math.min(93, toFiniteNumber(tower?.x, 8))),
+            y: Math.max(8, Math.min(90, toFiniteNumber(tower?.y, 8))),
           }))
           .filter((tower) => Number.isFinite(tower.x) && Number.isFinite(tower.y))
           .slice(0, 12)
         : [];
       state.towerDefense = {
-        wave: Math.max(1, Math.floor(Number(loadedTd.wave || 1))),
-        breaches: Math.max(0, Math.floor(Number(loadedTd.breaches || 0))),
-        enemyHp: Math.max(1, Number(loadedTd.enemyHp || tdWaveValue(Number(loadedTd.wave || 1)))),
-        enemyMaxHp: Math.max(1, Number(loadedTd.enemyMaxHp || tdWaveValue(Number(loadedTd.wave || 1)))),
-        enemyProgress: Math.min(1, Math.max(0, Number(loadedTd.enemyProgress || 0))),
-        spellPressure: Math.max(0, Number(loadedTd.spellPressure || 0)),
-        spellFreezeSec: Math.max(0, Number(loadedTd.spellFreezeSec || 0)),
+        wave: Math.max(1, Math.floor(toFiniteNumber(loadedTd.wave, 1))),
+        breaches: Math.max(0, Math.floor(toFiniteNumber(loadedTd.breaches, 0))),
+        enemyHp: Math.max(1, toFiniteNumber(loadedTd.enemyHp, tdWaveValue(toFiniteNumber(loadedTd.wave, 1)))),
+        enemyMaxHp: Math.max(1, toFiniteNumber(loadedTd.enemyMaxHp, tdWaveValue(toFiniteNumber(loadedTd.wave, 1)))),
+        enemyProgress: Math.min(1, Math.max(0, toFiniteNumber(loadedTd.enemyProgress, 0))),
+        spellPressure: Math.max(0, toFiniteNumber(loadedTd.spellPressure, 0)),
+        spellFreezeSec: Math.max(0, toFiniteNumber(loadedTd.spellFreezeSec, 0)),
         shotCooldown: 0,
-        placedTowers: loadedPlacedTowers,
         visualShots: [],
         damageNumbers: [],
       };
@@ -3087,6 +3149,7 @@
     }
 
     function renderTowerDefense() {
+      if (window.__RUST_TD_ACTIVE) return;
       const td = state.towerDefense;
       const hpPct = Math.max(0, Math.min(100, (td.enemyHp / Math.max(1, td.enemyMaxHp)) * 100));
       const progressPct = Math.max(0, Math.min(100, td.enemyProgress * 100));
@@ -3096,49 +3159,25 @@
       const powerRatio = tdPowerRatio();
       const towerPowerLow = powerRatio < 1;
       const enemyPos = tdPathPosition(td.enemyProgress);
+      const routeLength = els.tdRouteProgress.getTotalLength();
+      const visibleLength = routeLength * Math.max(0, Math.min(1, td.enemyProgress));
       els.tdWave.textContent = String(td.wave);
       els.tdBreaches.textContent = String(td.breaches);
-      els.tdDistance.textContent = `Distance to gate: ${(100 - progressPct).toFixed(0)}% • HP ${(hpPct).toFixed(0)}%`;
-      els.tdEnemyHealthFill.style.width = `${hpPct.toFixed(2)}%`;
-      const tdRenderData = tdRenderer.render({
-        enemyProgress: td.enemyProgress,
-        enemyPosition: enemyPos,
-        towers: tdAllTowerPositions(),
-        lowPower: towerPowerLow,
-        freezeSec: td.spellFreezeSec,
-        damageNumbers: td.damageNumbers,
-        shots: td.visualShots.map((shot) => {
-          const progress = Math.min(1, shot.age / Math.max(0.001, shot.life));
-          return {
-            pos: {
-              x: shot.from.x + ((shot.to.x - shot.from.x) * progress),
-              y: shot.from.y + ((shot.to.y - shot.from.y) * progress),
-            },
-            progress,
-          };
-        }),
-      });
-      const enemyHudAnchor = tdRenderData?.enemyHudAnchor;
-      if (enemyHudAnchor) {
-        const clampedX = Math.max(0.02, Math.min(0.98, enemyHudAnchor.x));
-        const clampedY = Math.max(0.03, Math.min(0.97, enemyHudAnchor.y));
-        els.tdEnemyUnit.style.left = `${(clampedX * 100).toFixed(2)}%`;
-        els.tdEnemyUnit.style.top = `${(clampedY * 100).toFixed(2)}%`;
-        els.tdEnemyUnit.style.opacity = "1";
-      } else {
-        els.tdEnemyUnit.style.left = `${enemyPos.x.toFixed(2)}%`;
-        els.tdEnemyUnit.style.top = `${enemyPos.y.toFixed(2)}%`;
-        els.tdEnemyUnit.style.opacity = tdRenderer.available ? "0" : "1";
-      }
-      const projectedDamageAnchors = tdRenderData?.damageAnchors || [];
-      els.tdDamageLayer.innerHTML = td.damageNumbers.map((num, idx) => {
+      els.tdEnemyHp.style.width = `${hpPct.toFixed(2)}%`;
+      els.tdDistance.textContent = `Distance to gate: ${(100 - progressPct).toFixed(0)}%`;
+      els.tdEnemyUnit.style.left = `${enemyPos.x.toFixed(2)}%`;
+      els.tdEnemyUnit.style.top = `${enemyPos.y.toFixed(2)}%`;
+      els.tdRouteProgress.style.strokeDasharray = `${visibleLength.toFixed(2)} ${Math.max(0, routeLength - visibleLength).toFixed(2)}`;
+      els.tdPath.classList.toggle("low-power", towerPowerLow);
+      els.tdShots.innerHTML = td.visualShots.map((shot) => {
+        const progress = Math.min(1, shot.age / Math.max(0.001, shot.life));
+        const x = shot.from.x + ((shot.to.x - shot.from.x) * progress);
+        const y = shot.from.y + ((shot.to.y - shot.from.y) * progress);
+        return `<span class="td-shot" style="left:${x.toFixed(2)}%;top:${y.toFixed(2)}%;opacity:${(1 - progress).toFixed(2)}"></span>`;
+      }).join("");
+      els.tdDamageLayer.innerHTML = td.damageNumbers.map((num) => {
         const alpha = Math.max(0, 1 - (num.age / Math.max(0.001, num.life)));
-        const projected = projectedDamageAnchors[idx];
-        const x = projected?.x ?? (num.x / 100);
-        const y = projected?.y ?? (num.y / 100);
-        const clampedX = Math.max(0.02, Math.min(0.98, x));
-        const clampedY = Math.max(0.02, Math.min(0.98, y));
-        return `<span class="td-damage" style="left:${(clampedX * 100).toFixed(2)}%;top:${(clampedY * 100).toFixed(2)}%;opacity:${alpha.toFixed(2)}">-${format(num.value)}</span>`;
+        return `<span class="td-damage" style="left:${num.x.toFixed(2)}%;top:${num.y.toFixed(2)}%;opacity:${alpha.toFixed(2)}">-${format(num.value)}</span>`;
       }).join("");
       if (towerPowerLow) {
         const pct = Math.max(0, Math.min(100, powerRatio * 100));
